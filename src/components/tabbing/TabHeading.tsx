@@ -25,12 +25,9 @@ const TabHeading: Component<{
                     "relative w-50 px-2 py-1 pr-6 box-border cursor-pointer " +
                     (isActive()
                         ? "bg-gray-200/40 upper-shadow rounded-tl-md rounded-tr-md z-10"
-                        : "z-0")
+                        : "z-0 hover:bg-gray-300/40 rounded-tl-md rounded-tr-md")
                 }
             >
-                {!isActive() && (
-                    <div class="absolute right-0 top-1/4 bottom-0 w-px bg-gray-700" />
-                )}
 
                 <label
                     class={
@@ -49,7 +46,7 @@ const TabHeading: Component<{
                         e.stopPropagation(); // prevent tab selection
                         removeTab(tab.id);
                     }}
-                    title="Close tab"
+                    title="Close Tab"
                 >
                     <FaSolidXmark class="w-3 h-3" />
                 </button>

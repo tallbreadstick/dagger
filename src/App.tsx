@@ -7,6 +7,8 @@ import TabHeading from "./components/tabbing/TabHeading";
 
 import { FaSolidPlus, FaSolidChevronLeft, FaSolidChevronRight } from "solid-icons/fa";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import Sidebar from "./components/sidebar/Sidebar";
+import NavigationBar from "./components/navigation/NavigationBar";
 
 export default function App() {
 
@@ -130,8 +132,9 @@ export default function App() {
             </div>
 
             {/* Content area */}
-            <div class="w-full h-full grow bg-gray-200/40 z-1">
-                {/* Render something here based on currentTab */}
+            <div class="w-full h-full grow flex flex-col bg-gray-200/40 z-1">
+                {/* Sidebar */}
+                <NavigationBar />
             </div>
         </div>
     );
