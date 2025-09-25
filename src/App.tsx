@@ -9,6 +9,7 @@ import { FaSolidPlus, FaSolidChevronLeft, FaSolidChevronRight } from "solid-icon
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import Sidebar from "./components/sidebar/Sidebar";
 import NavigationBar from "./components/navigation/NavigationBar";
+import TitleBar from "./components/window/TitleBar";
 
 export default function App() {
 
@@ -18,7 +19,7 @@ export default function App() {
         new Tab("C:\\Program Files"),
         new Tab("C:\\Program Files (x86)"),
         new Tab("C:\\Users\\Owner"),
-        new Tab("C:\\Windows"),
+        new Tab("C:\\CSIT327 - Information Management 2"),
         new Tab("C:\\Temp")
     ]);
 
@@ -82,6 +83,8 @@ export default function App() {
 
     return (
         <div class="w-full h-full flex flex-col overflow-hidden">
+            {/* Title bar */}
+            <TitleBar />
             {/* Tab bar */}
             <div class="flex flex-row items-center w-full h-fit px-2 box-border border-gray-300">
                 {/* Left arrow */}

@@ -29,7 +29,6 @@ export default function SearchBar() {
                     <button title="Draw a sketch" class="p-1 hover:bg-gray-200 rounded">
                         <FaSolidPen class="w-4 h-4" />
                     </button>
-                    <input type="file" accept="image/*" class="hidden" id="image-upload" />
                     <label for="image-upload" class="p-1 hover:bg-gray-200 rounded cursor-pointer">
                         <FaSolidFolder class="w-4 h-4 text-black" />
                     </label>
@@ -42,7 +41,6 @@ export default function SearchBar() {
                     <button title="Record with mic" class="p-1 hover:bg-gray-200 rounded">
                         <FaSolidMicrophone class="w-4 h-4" />
                     </button>
-                    <input type="file" accept="audio/*" class="hidden" id="audio-upload" />
                     <label for="audio-upload" class="p-1 hover:bg-gray-200 rounded cursor-pointer">
                         <FaSolidFolder class="w-4 h-4 text-black" />
                     </label>
@@ -52,7 +50,6 @@ export default function SearchBar() {
             {mode() === "document" && (
                 <div class="flex flex-row items-center w-full gap-2">
                     <textarea class="w-full text-sm outline-none border border-gray-300 rounded px-2 py-1 resize-none" rows={1} placeholder="Describe a document..." />
-                    <input type="file" accept=".pdf,.doc,.docx,.txt" class="hidden" id="doc-upload" />
                     <label for="doc-upload" class="p-1 hover:bg-gray-200 rounded cursor-pointer">
                         <FaSolidFolder class="w-4 h-4 text-black" />
                     </label>
