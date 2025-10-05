@@ -34,3 +34,14 @@ body {
 label, select, textarea, button, input {
     font-family: 'Outfit';
 }
+
+body.unfocused::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.75); /* translucent milky tone */
+  backdrop-filter: blur(25px) saturate(150%);
+  transition: all 0.2s ease;
+  pointer-events: none; /* let clicks pass through */
+  z-index: -1000; /* make sure it sits on top */
+}

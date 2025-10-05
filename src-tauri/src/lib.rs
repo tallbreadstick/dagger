@@ -1,5 +1,7 @@
+#[cfg(target_os = "windows")]
+use tauri::Emitter;
 use tauri::Manager;
-use window_vibrancy::apply_acrylic;
+use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 pub mod filesys;
 pub mod search;
@@ -30,9 +32,22 @@ pub fn run() {
             let win_clone = window.clone();
 
             window.on_window_event(move |event| {
-                if let tauri::WindowEvent::Focused(true) = event {
-                    #[cfg(target_os = "windows")]
-                    window_vibrancy::apply_acrylic(&win_clone, Some((18, 18, 18, 125))).ok();
+                match event {
+                    tauri::WindowEvent::Focused(true) => {
+                        #[cfg(target_os = "windows")]
+                        {
+                            let _ = win_clone.emit("window-focus", ());
+                            apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
+                        }
+                    }
+                    tauri::WindowEvent::Focused(false) => {
+                        #[cfg(target_os = "windows")]
+                        {
+                            let _ = win_clone.emit("window-blur", ());
+                            clear_acrylic(&win_clone).ok();
+                        }
+                    }
+                    _ => {}
                 }
             });
 

@@ -1,16 +1,43 @@
-import { createSignal } from "solid-js";
+/**
+ * NavigationBar.tsx
+ * -----------------
+ * Toolbar containing navigation buttons, path display, and the SearchBar.
+ * Switches dynamically between:
+ *  - Path input mode
+ *  - Search mode with selectable search type (text/image/audio/document)
+ *
+ * Exposes a `registerFocusHandler` to the parent App component
+ * to allow keyboard shortcuts (Ctrl+F / Ctrl+1–4) to trigger input focus.
+ */
+
+import { onMount } from "solid-js";
+import SearchBar from "./SearchBar";
 import {
     FaSolidChevronLeft,
     FaSolidChevronRight,
     FaSolidArrowUp,
     FaSolidRotateRight,
     FaSolidMagnifyingGlass,
-    FaSolidFolder
+    FaSolidFolder,
 } from "solid-icons/fa";
-import SearchBar from "./SearchBar";
 
-export default function NavigationBar() {
-    const [searchMode, setSearchMode] = createSignal(false);
+export default function NavigationBar(props: {
+    searchMode: boolean;
+    setSearchMode: (val: boolean) => void;
+    searchBarMode: string;
+    setSearchBarMode: (val: "text" | "image" | "audio" | "document") => void;
+    registerFocusHandler?: (handler: () => void) => void;
+}) {
+    let searchInputRef: HTMLInputElement | undefined;
+
+    onMount(() => {
+        // 🔹 Expose the focus handler to the parent (App)
+        if (props.registerFocusHandler && searchInputRef) {
+            props.registerFocusHandler(() => {
+                searchInputRef?.focus();
+            });
+        }
+    });
 
     return (
         <div class="w-full h-15 flex flex-row items-center px-2 gap-2 border-b border-gray-500">
@@ -30,29 +57,33 @@ export default function NavigationBar() {
                 </button>
             </div>
 
-            {/* Path or Search bar depending on mode */}
+            {/* Central area — switches between PathBar and SearchBar */}
             <div class="flex flex-row items-center grow bg-gray-300 border border-gray-300 rounded px-2 py-1">
-                {searchMode() ? (
-                    <SearchBar />
+                {props.searchMode ? (
+                    <SearchBar
+                        mode={props.searchBarMode}
+                        setMode={props.setSearchBarMode}
+                        inputRef={(el) => (searchInputRef = el)}
+                    />
                 ) : (
                     <div class="flex flex-row items-center w-full gap-2">
                         <FaSolidFolder class="w-4 h-4 text-black" />
                         <input
                             type="text"
-                            value="C:\Users\Owner\Documents"
+                            value="C:\\Users\\Owner\\Documents"
                             class="w-full text-sm outline-none bg-transparent"
                         />
                     </div>
                 )}
             </div>
 
-            {/* Toggle button */}
+            {/* Mode toggle button */}
             <button
-                onClick={() => setSearchMode(!searchMode())}
+                onClick={() => props.setSearchMode(!props.searchMode)}
                 class="p-2 rounded hover:bg-gray-200 active:bg-gray-300 transition"
-                title={searchMode() ? "Switch to Path Mode" : "Switch to Search Mode"}
+                title={props.searchMode ? "Switch to Path Mode" : "Switch to Search Mode"}
             >
-                {searchMode() ? (
+                {props.searchMode ? (
                     <FaSolidFolder class="w-4 h-4 text-black" />
                 ) : (
                     <FaSolidMagnifyingGlass class="w-4 h-4" />
