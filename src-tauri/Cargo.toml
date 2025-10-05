@@ -27,4 +27,5 @@ walkdir = "2.5.0"
 ort = "1.16.3"
 tantivy = "0.25.0"
 notify = "8.2.0"
+rfd = "0.15.4"
 

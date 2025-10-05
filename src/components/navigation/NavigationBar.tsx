@@ -39,7 +39,7 @@ export default function NavigationBar() {
                         <FaSolidFolder class="w-4 h-4 text-black" />
                         <input
                             type="text"
-                            value="C:\\Users\\Owner\\Documents"
+                            value="C:\Users\Owner\Documents"
                             class="w-full text-sm outline-none bg-transparent"
                         />
                     </div>

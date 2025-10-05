@@ -22,7 +22,7 @@ const TabHeading: Component<{
             <div
                 onClick={selectTab}
                 class={
-                    "relative min-w-40 max-w-60 px-2 py-1 pr-6 box-border cursor-pointer " +
+                    "relative min-w-40 max-w-50 px-3 py-1 pr-6 box-border cursor-pointer " +
                     (isActive()
                         ? "bg-gray-200/40 upper-shadow rounded-tl-md rounded-tr-md z-10"
                         : "z-0 hover:bg-gray-300/40 rounded-tl-md rounded-tr-md")

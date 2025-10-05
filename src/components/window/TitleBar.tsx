@@ -23,7 +23,7 @@ export default function TitleBar() {
     return (
         <div
             data-tauri-drag-region
-            class="w-full h-8 flex items-center justify-between bg-gray-800 text-white select-none"
+            class="w-full h-8 flex items-center justify-between bg-gray-950/70 text-white select-none"
         >
             {/* Left: Logo + Title */}
             <div class="flex items-center gap-2 pl-2">

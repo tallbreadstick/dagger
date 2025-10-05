@@ -1,0 +1,5 @@
+/*
+
+    this file handles interfaces with various models as well as qdrant database connection
+
+*/
