@@ -1,10 +1,10 @@
-import { Accessor, Component, Setter } from "solid-js";
+import { Accessor, Component } from "solid-js";
 import Tab from "../../classes/Tab";
 import { FaSolidXmark } from "solid-icons/fa";
 
 const TabHeading: Component<{
     currentTab: Accessor<Tab | null>,
-    setCurrentTab: Setter<Tab | null>,
+    setCurrentTab: (tab: Tab | null) => void,
     tab: Tab,
     removeTab: (id: number) => void
 }> = ({ currentTab, setCurrentTab, tab, removeTab }) => {
