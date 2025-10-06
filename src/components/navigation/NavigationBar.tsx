@@ -16,6 +16,7 @@ import {
 } from "solid-icons/fa";
 import type { Accessor, Setter } from "solid-js";
 import type { TabEntry } from "../../App";
+import Tab from "../../classes/Tab";
 
 export default function NavigationBar(props: {
     currentTabEntry: Accessor<TabEntry | null>;
@@ -42,61 +43,80 @@ export default function NavigationBar(props: {
         entry.setTab((prev) => prev as any);
     }
 
+    // helpers to force a store update safely
+    function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
+        if (!entry) return;
+        const newTab = updater(entry.tab);
+        entry.setTab(newTab); // Solid sees replacement, no store mutation
+    }
+
     const goBack = () => {
         const entry = props.currentTabEntry();
-        const tab = entry?.tab ?? null;
-        if (!tab || !tab.canGoBack()) return;
-        tab.goBack();
-        triggerEntryUpdate(entry);
+        if (!entry || !entry.tab.canGoBack()) return;
+
+        updateTab(entry, (tab) => {
+            const newTab = tab.clone();
+            newTab.goBack(); // mutate clone
+            return newTab;
+        });
     };
 
     const goForward = () => {
         const entry = props.currentTabEntry();
-        const tab = entry?.tab ?? null;
-        if (!tab || !tab.canGoForward()) return;
-        tab.goForward();
-        triggerEntryUpdate(entry);
+        if (!entry || !entry.tab.canGoForward()) return;
+
+        updateTab(entry, (tab) => {
+            const newTab = tab.clone();
+            newTab.goForward();
+            return newTab;
+        });
     };
 
     const goUp = () => {
         const entry = props.currentTabEntry();
-        const tab = entry?.tab ?? null;
-        if (!tab || !tab.canGoUp()) return;
-        tab.goUp();
-        triggerEntryUpdate(entry);
+        if (!entry || !entry.tab.canGoUp()) return;
+
+        updateTab(entry, (tab) => {
+            const newTab = tab.clone();
+            newTab.goUp();
+            return newTab;
+        });
     };
 
     const refresh = () => {
-        triggerEntryUpdate(props.currentTabEntry());
+        const entry = props.currentTabEntry();
+        if (!entry) return;
+        entry.setTab((prev) => prev as any); // just re-trigger
     };
 
-    const currentTab = props.currentTabEntry()?.tab ?? null;
+    // Make currentTab reactive by calling it as a function
+    const currentTab = () => props.currentTabEntry()?.tab ?? null;
 
     return (
         <div class="w-full h-15 flex flex-row items-center px-2 gap-2 border-b border-gray-500">
             <div class="flex flex-row items-center gap-1">
                 <button
-                    disabled={!currentTab?.canGoBack()}
+                    disabled={!currentTab()?.canGoBack()}
                     onClick={goBack}
-                    class={`p-2 rounded transition ${currentTab?.canGoBack() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
+                    class={`p-2 rounded transition ${currentTab()?.canGoBack() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
                     title="Back"
                 >
                     <FaSolidChevronLeft class="w-4 h-4" />
                 </button>
 
                 <button
-                    disabled={!currentTab?.canGoForward()}
+                    disabled={!currentTab()?.canGoForward()}
                     onClick={goForward}
-                    class={`p-2 rounded transition ${currentTab?.canGoForward() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
+                    class={`p-2 rounded transition ${currentTab()?.canGoForward() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
                     title="Forward"
                 >
                     <FaSolidChevronRight class="w-4 h-4" />
                 </button>
 
                 <button
-                    disabled={!currentTab?.canGoUp()}
+                    disabled={!currentTab()?.canGoUp()}
                     onClick={goUp}
-                    class={`p-2 rounded transition ${currentTab?.canGoUp() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
+                    class={`p-2 rounded transition ${currentTab()?.canGoUp() ? "hover:bg-gray-200 active:bg-gray-300" : "opacity-50 cursor-not-allowed"}`}
                     title="Up one level"
                 >
                     <FaSolidArrowUp class="w-4 h-4" />
@@ -114,7 +134,7 @@ export default function NavigationBar(props: {
                 ) : (
                     <div class="flex flex-row items-center w-full gap-2">
                         <FaSolidFolder class="w-4 h-4 text-black" />
-                        <input type="text" value={currentTab?.workingDir ?? ""} class="w-full text-sm outline-none bg-transparent" readOnly />
+                        <input type="text" value={currentTab()?.workingDir ?? ""} class="w-full text-sm outline-none bg-transparent" readOnly />
                     </div>
                 )}
             </div>

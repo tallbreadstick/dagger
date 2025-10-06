@@ -8,8 +8,8 @@ const TabHeading: Component<{
     tab: Tab,
     removeTab: (id: number) => void
 }> = ({ currentTab, setCurrentTab, tab, removeTab }) => {
-    const tokens = tab.workingDir.split("\\");
-    const name = tokens[tokens.length - 1];
+    const tokens = tab.workingDir.split("\\").filter(Boolean); // remove empty tokens
+    const name = tokens.length > 0 ? tokens[tokens.length - 1] : tab.workingDir; // fallback to full path
 
     function selectTab() {
         setCurrentTab(tab);

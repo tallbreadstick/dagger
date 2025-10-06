@@ -13,8 +13,10 @@ use crate::{
         upload_document_file
     },
     filesys::nav::{
+        register_recent_access,
+        // get_home_directory,
         list_directory_contents,
-        get_directory_tree
+        get_tree_from_root
     }
 };
 
@@ -28,8 +30,10 @@ pub fn run() {
             upload_audio_file,
             upload_document_file,
             // filesys
+            register_recent_access,
+            // get_home_directory,
             list_directory_contents,
-            get_directory_tree
+            get_tree_from_root
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

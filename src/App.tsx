@@ -74,7 +74,7 @@ export default function App() {
 
     // tabs array (store) — array of TabEntry
     const [tabs, setTabs] = createStore<TabEntry[]>([
-        makeTab("C:\\Program Files"),
+        makeTab("C:\\Users\\ACER\\Documents"),
     ]);
 
     // current tab points to a TabEntry (or null)

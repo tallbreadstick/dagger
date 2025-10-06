@@ -4,10 +4,8 @@
  * Represents a single tab in the file explorer.
  * Manages directory navigation history and stack traversal.
  */
-
 export default class Tab {
     static serial: number = 0;
-
     id: number;
     workingDir: string;
     backStack: string[];
@@ -22,6 +20,8 @@ export default class Tab {
 
     /** Navigate to a new directory */
     navigateTo(newPath: string) {
+        if (newPath === this.workingDir) return; // Don't navigate to same path
+        
         if (this.workingDir) {
             this.backStack.push(this.workingDir);
         }
@@ -47,27 +47,28 @@ export default class Tab {
 
     /** Go up one directory level */
     goUp(): string | null {
-        const parts = this.workingDir.split(/[/\\]+/);
+        const parts = this.workingDir.split(/[/\\]+/).filter(p => p.length > 0);
         if (parts.length <= 1) return null; // no parent dir
+        
         parts.pop();
-        const parent = parts.join("\\");
+        const parent = parts.join("\\") || "C:\\";
         this.navigateTo(parent);
         return parent;
     }
 
-    /** Returns true if there’s a previous directory */
+    /** Returns true if there's a previous directory */
     canGoBack() {
         return this.backStack.length > 0;
     }
 
-    /** Returns true if there’s a forward directory */
+    /** Returns true if there's a forward directory */
     canGoForward() {
         return this.forwardStack.length > 0;
     }
 
-    /** Returns true if there’s a parent directory */
+    /** Returns true if there's a parent directory */
     canGoUp() {
-        const parts = this.workingDir.split(/[/\\]+/);
+        const parts = this.workingDir.split(/[/\\]+/).filter(p => p.length > 0);
         return parts.length > 1;
     }
 
