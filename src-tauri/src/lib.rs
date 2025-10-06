@@ -6,10 +6,16 @@ use window_vibrancy::{apply_acrylic, clear_acrylic};
 pub mod filesys;
 pub mod search;
 
-use crate::search::modals::{
-    upload_image_file,
-    upload_audio_file,
-    upload_document_file
+use crate::{
+    search::modals::{
+        upload_image_file,
+        upload_audio_file,
+        upload_document_file
+    },
+    filesys::nav::{
+        list_directory_contents,
+        get_directory_tree
+    }
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -17,9 +23,13 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            // modals
             upload_image_file,
             upload_audio_file,
-            upload_document_file
+            upload_document_file,
+            // filesys
+            list_directory_contents,
+            get_directory_tree
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

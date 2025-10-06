@@ -4,7 +4,7 @@
  * Main application root for the Tauri + SolidJS file explorer.
  */
 
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup, onMount } from "solid-js";
 import "./index.css";
 
 import TitleBar from "./components/window/TitleBar";
@@ -23,7 +23,48 @@ export type TabEntry = {
 };
 
 export default function App() {
+
     useWindowFocusEvents();
+
+    // 🧱 Sidebar width + constraints
+    const [sidebarWidth, setSidebarWidth] = createSignal(288); // default 72 * 4
+    const minWidth = 180;
+    const maxWidth = 420;
+
+    // dragging state
+    let sidebarRef: HTMLDivElement | undefined;
+    let isResizing = false;
+
+    function startResize(e: MouseEvent) {
+        isResizing = true;
+        e.preventDefault();
+        document.body.style.cursor = "col-resize";
+    }
+
+    function stopResize() {
+        if (isResizing) {
+            isResizing = false;
+            document.body.style.cursor = "";
+        }
+    }
+
+    function handleResize(e: MouseEvent) {
+        if (!isResizing || !sidebarRef) return;
+        const sidebarLeft = sidebarRef.getBoundingClientRect().left;
+        const newWidth = Math.min(Math.max(e.clientX - sidebarLeft, minWidth), maxWidth);
+        setSidebarWidth(newWidth);
+    }
+
+    // global listeners for smooth dragging
+    onMount(() => {
+        window.addEventListener("mousemove", handleResize);
+        window.addEventListener("mouseup", stopResize);
+
+        onCleanup(() => {
+            window.removeEventListener("mousemove", handleResize);
+            window.removeEventListener("mouseup", stopResize);
+        });
+    });
 
     // factory to create a TabEntry
     function makeTab(path: string): TabEntry {
@@ -34,10 +75,6 @@ export default function App() {
     // tabs array (store) — array of TabEntry
     const [tabs, setTabs] = createStore<TabEntry[]>([
         makeTab("C:\\Program Files"),
-        makeTab("C:\\Program Files (x86)"),
-        makeTab("C:\\Users\\Owner"),
-        makeTab("C:\\CSIT327 - Information Management 2"),
-        makeTab("C:\\Temp"),
     ]);
 
     // current tab points to a TabEntry (or null)
@@ -110,7 +147,8 @@ export default function App() {
                 duplicateTab={(id: number) => duplicateTabById(id)}
             />
 
-            <div class="w-full h-full grow flex flex-col bg-gray-200/40 z-1">
+            <div class="flex flex-col flex-1 min-h-0 bg-gray-200/40 z-1">
+                {/* NavigationBar — fixed height */}
                 <NavigationBar
                     currentTabEntry={currentTab}
                     setCurrentTabEntry={setCurrentTab}
@@ -121,10 +159,47 @@ export default function App() {
                     registerFocusHandler={(fn) => (focusSearchInput = fn)}
                 />
 
-                <div class="flex flex-row grow overflow-hidden">
-                    <Sidebar />
+                <div class="flex flex-row flex-1 min-h-0 overflow-hidden select-none">
+                    {/* Sidebar + Resizer group */}
+                    <div
+                        class="flex flex-row flex-shrink-0"
+                        style={{
+                            width: `${sidebarWidth()}px`,
+                            "min-width": `${minWidth}px`,
+                            "max-width": `${maxWidth}px`,
+                            transition: isResizing ? "none" : "width 0.1s ease-out",
+                        }}
+                    >
+                        <div
+                            ref={sidebarRef}
+                            class="h-full w-full"
+                        >
+                            <Sidebar
+                                currentTab={currentTab}
+                                setCurrentTab={setCurrentTab}
+                            />
+                        </div>
+
+                        {/* 🧭 Resizer handle */}
+                        <div
+                            onMouseDown={startResize}
+                            class="w-1 cursor-col-resize bg-transparent hover:bg-white/20 active:bg-white/40 transition-colors duration-150"
+                            style={{
+                                "user-select": "none",
+                                "touch-action": "none",
+                                position: "relative",
+                                "z-index": 10,
+                            }}
+                        />
+                    </div>
+
+                    {/* Main View */}
+                    <div class="flex-1 min-w-0 overflow-auto">
+                        {/* your file view, editor, etc. */}
+                    </div>
                 </div>
             </div>
+
         </div>
     );
 }
