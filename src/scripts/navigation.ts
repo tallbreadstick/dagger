@@ -31,3 +31,17 @@ export async function getDirectoryTreeFromRoot(path: string): Promise<FileNode> 
     throw err;
   }
 }
+
+/**
+ * Resolves the current user's home directory using the Tauri backend.
+ * @returns A promise that resolves to the home directory path as a string.
+ */
+export async function resolveUserHome(): Promise<string> {
+  try {
+    const homeDir = await invoke<string>("resolve_user");
+    return homeDir;
+  } catch (err) {
+    console.error("Failed to resolve user home directory:", err);
+    throw err;
+  }
+}

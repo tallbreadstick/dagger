@@ -258,3 +258,11 @@ pub fn list_directory_contents(path: &str) -> Result<Vec<FileItem>, String> {
 
     Ok(items)
 }
+
+#[tauri::command]
+pub fn resolve_user(handle: AppHandle) -> Result<String, String> {
+    handle.path()
+        .home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|_| "Failed to resolve home directory".to_string())
+}

@@ -14,9 +14,9 @@ use crate::{
     },
     filesys::nav::{
         register_recent_access,
-        // get_home_directory,
         list_directory_contents,
-        get_tree_from_root
+        get_tree_from_root,
+        resolve_user
     }
 };
 
@@ -31,9 +31,9 @@ pub fn run() {
             upload_document_file,
             // filesys
             register_recent_access,
-            // get_home_directory,
             list_directory_contents,
-            get_tree_from_root
+            get_tree_from_root,
+            resolve_user
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

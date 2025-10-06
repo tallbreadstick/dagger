@@ -84,8 +84,11 @@ export default function App() {
     function addTab(path = "C:") {
         const entry = makeTab(path);
         setTabs((prev) => [...prev, entry]);
-        // make new tab the current tab
-        setCurrentTab(entry);
+        // Important: after store updates, re-bind currentTab
+        queueMicrotask(() => {
+            const index = tabs.length - 1;
+            setCurrentTab(tabs[index]); // point to reactive version
+        });
     }
 
     function removeTabById(id: number) {

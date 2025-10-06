@@ -10,6 +10,19 @@
     "core:window:allow-maximize",
     "core:window:allow-unmaximize",
     "core:window:allow-start-dragging",
-    "opener:default"
+    "opener:default",
+    {
+      "identifier": "opener:allow-open-path",
+      "allow": [
+        { "path": "$HOME/Documents/**/*" },
+        { "path": "$HOME/Downloads/**/*" },
+        { "path": "$HOME/Desktop/**/*" },
+        { "path": "$HOME/Music/**/*" },
+        { "path": "$HOME/Pictures/**/*" },
+        { "path": "$HOME/Videos/**/*" },
+        { "path": "$TMPDIR/**/*" },
+        { "path": "/tmp/**/*" }
+      ]
+    }
   ]
 }

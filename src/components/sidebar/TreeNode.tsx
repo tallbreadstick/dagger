@@ -1,6 +1,19 @@
 import { createEffect, createSignal, For, Show } from "solid-js";
 import { listDirectoryContents, FileNode } from "../../scripts/navigation";
-import { FaSolidFolder, FaSolidFolderOpen, FaSolidFile } from "solid-icons/fa";
+import {
+    FaSolidFolder,
+    FaSolidFolderOpen,
+    FaSolidFile,
+    FaSolidFilePdf,
+    FaSolidFileWord,
+    FaSolidFileExcel,
+    FaSolidBoxArchive,
+    FaSolidFileAudio,
+    FaSolidFileVideo,
+    FaSolidFileImage,
+    FaSolidFileCode,
+} from "solid-icons/fa";
+import { openPath } from "@tauri-apps/plugin-opener";
 
 export function TreeNode(props: {
     node: FileNode;
@@ -47,12 +60,11 @@ export function TreeNode(props: {
         if (!props.node.is_dir) return;
 
         if (!expanded()) {
-            // Collapse siblings if parent provided
             if (props.parentChildren && props.parentSetChildren) {
                 const siblings = props.parentChildren();
                 const updatedSiblings = siblings.map((sib) => {
                     if (sib !== props.node && sib.children) {
-                        return { ...sib }; // placeholder, actual collapse handled in child signals
+                        return { ...sib }; // actual collapse handled by child signals
                     }
                     return sib;
                 });
@@ -70,7 +82,37 @@ export function TreeNode(props: {
 
     function handleDoubleClick(e: MouseEvent) {
         e.stopPropagation();
-        if (props.node.is_dir) props.onNavigate(props.node.path);
+        if (props.node.is_dir) {
+            props.onNavigate(props.node.path);
+        } else {
+            // Open non-directory files
+            openPath(props.node.path).catch((err) => {
+                console.error("Failed to open file:", err);
+            });
+        }
+    }
+
+    // Return the proper icon component for a file based on its extension
+    function getFileIcon(name: string) {
+        const ext = name.split(".").pop()?.toLowerCase() ?? "";
+
+        const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md"];
+        const sheetExts = ["xls", "xlsx", "csv", "ods"];
+        const videoExts = ["mp4", "mov", "m4v", "mkv", "avi", "webm"];
+        const audioExts = ["mp3", "wav", "ogg", "m4a", "flac", "aac"];
+        const imageExts = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "svg"];
+        const archiveExts = ["zip", "7z", "rar", "tar", "gz", "bz2", "xz"];
+        const execExts = ["exe", "msi", "jar", "bat", "sh", "app", "bin"];
+
+        if (docExts.includes(ext)) return <FaSolidFileWord class="text-blue-400 w-3 h-3" />;
+        if (sheetExts.includes(ext)) return <FaSolidFileExcel class="text-green-400 w-3 h-3" />;
+        if (videoExts.includes(ext)) return <FaSolidFileVideo class="text-purple-400 w-3 h-3" />;
+        if (audioExts.includes(ext)) return <FaSolidFileAudio class="text-indigo-400 w-3 h-3" />;
+        if (imageExts.includes(ext)) return <FaSolidFileImage class="text-pink-400 w-3 h-3" />;
+        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class="text-yellow-400 w-3 h-3" />;
+        if (execExts.includes(ext)) return <FaSolidFileCode class="text-red-400 w-3 h-3" />;
+
+        return <FaSolidFile class="text-gray-500 w-3 h-3" />; // fallback
     }
 
     return (
@@ -81,10 +123,7 @@ export function TreeNode(props: {
                 onClick={toggleExpand}
                 onDblClick={handleDoubleClick}
             >
-                <Show
-                    when={props.node.is_dir}
-                    fallback={<FaSolidFile class="text-gray-500 w-3 h-3" />}
-                >
+                <Show when={props.node.is_dir} fallback={getFileIcon(props.node.name)}>
                     <Show when={expanded()} fallback={<FaSolidFolder class="text-gray-50 w-3 h-3" />}>
                         <FaSolidFolderOpen class="text-gray-50 w-3 h-3" />
                     </Show>
