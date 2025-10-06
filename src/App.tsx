@@ -29,7 +29,7 @@ export default function App() {
     // 🧱 Sidebar width + constraints
     const [sidebarWidth, setSidebarWidth] = createSignal(288); // default 72 * 4
     const minWidth = 180;
-    const maxWidth = 420;
+    const maxWidth = 450;
 
     // dragging state
     let sidebarRef: HTMLDivElement | undefined;
@@ -164,37 +164,39 @@ export default function App() {
 
                 <div class="flex flex-row flex-1 min-h-0 overflow-hidden select-none">
                     {/* Sidebar + Resizer group */}
-                    <div
-                        class="flex flex-row flex-shrink-0"
-                        style={{
-                            width: `${sidebarWidth()}px`,
-                            "min-width": `${minWidth}px`,
-                            "max-width": `${maxWidth}px`,
-                            transition: isResizing ? "none" : "width 0.1s ease-out",
-                        }}
-                    >
+                    <div class="flex flex-row flex-1 min-h-0 overflow-hidden select-none">
+                        {/* Sidebar container */}
                         <div
                             ref={sidebarRef}
-                            class="h-full w-full"
+                            class="flex flex-row flex-shrink-0 border-r border-gray-400/30"
+                            style={{
+                                width: `${sidebarWidth()}px`,
+                                "min-width": `${minWidth}px`,
+                                "max-width": `${maxWidth}px`,
+                                transition: isResizing ? "none" : "width 0.1s ease-out",
+                            }}
                         >
                             <Sidebar
                                 currentTab={currentTab}
                                 setCurrentTab={setCurrentTab}
                             />
+                            {/* Resizer handle — inside same flex group for consistent layout */}
+                            <div
+                                onMouseDown={startResize}
+                                class="w-1 cursor-col-resize bg-transparent hover:bg-white/20 active:bg-white/40 transition-colors duration-150"
+                                style={{
+                                    "user-select": "none",
+                                    "touch-action": "none",
+                                }}
+                            />
                         </div>
 
-                        {/* 🧭 Resizer handle */}
-                        <div
-                            onMouseDown={startResize}
-                            class="w-1 cursor-col-resize bg-transparent hover:bg-white/20 active:bg-white/40 transition-colors duration-150"
-                            style={{
-                                "user-select": "none",
-                                "touch-action": "none",
-                                position: "relative",
-                                "z-index": 10,
-                            }}
-                        />
+                        {/* Main content area */}
+                        <div class="flex-1 min-w-0 overflow-auto">
+                            {/* Your file view */}
+                        </div>
                     </div>
+
 
                     {/* Main View */}
                     <div class="flex-1 min-w-0 overflow-auto">
