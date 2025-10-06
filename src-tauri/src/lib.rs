@@ -5,6 +5,7 @@ use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 pub mod filesys;
 pub mod search;
+pub mod util;
 
 use crate::{
     search::modals::{
@@ -17,7 +18,8 @@ use crate::{
         list_directory_contents,
         get_tree_from_root,
         resolve_user
-    }
+    },
+    util::cmd::resolve_path_command
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -33,7 +35,9 @@ pub fn run() {
             register_recent_access,
             list_directory_contents,
             get_tree_from_root,
-            resolve_user
+            resolve_user,
+            // util
+            resolve_path_command
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();

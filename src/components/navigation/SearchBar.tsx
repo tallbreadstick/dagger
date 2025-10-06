@@ -21,7 +21,7 @@ export default function SearchBar(props: {
     registerFocusHandler?: (fn: () => void) => void;
     inputRef?: (el: HTMLInputElement) => void;
 }) {
-    const [selectedFile, setSelectedFile] = createSignal<string | null>(null);
+    const [_selectedFile, setSelectedFile] = createSignal<string | null>(null);
     const [inputEl, setInputEl] = createSignal<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
     // 🔹 Register external focus handler for App shortcuts

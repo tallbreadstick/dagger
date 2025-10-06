@@ -17,6 +17,7 @@ import {
 import type { Accessor, Setter } from "solid-js";
 import type { TabEntry } from "../../App";
 import Tab from "../../classes/Tab";
+import PathBar from "./PathBar";
 
 export default function NavigationBar(props: {
     currentTabEntry: Accessor<TabEntry | null>;
@@ -132,10 +133,23 @@ export default function NavigationBar(props: {
                 {props.searchMode ? (
                     <SearchBar mode={props.searchBarMode} setMode={props.setSearchBarMode} inputRef={(el) => (searchInputRef = el)} />
                 ) : (
-                    <div class="flex flex-row items-center w-full gap-2">
-                        <FaSolidFolder class="w-4 h-4 text-black" />
-                        <input type="text" value={currentTab()?.workingDir ?? ""} class="w-full text-sm outline-none bg-transparent" readOnly />
-                    </div>
+                    <PathBar
+                        currentPath={currentTab()?.workingDir ?? ""}
+                        onNavigate={(newPath) => {
+                            const entry = props.currentTabEntry();
+                            if (!entry) return;
+
+                            // Normalize slashes
+                            const normalizedPath = newPath.replace(/\//g, "\\");
+
+                            // Use the existing updateTab helper to safely mutate & notify Solid
+                            updateTab(entry, (tab) => {
+                                const newTab = tab.clone();
+                                newTab.navigateTo(normalizedPath); // <- mutate the clone
+                                return newTab; // <- return for setTab
+                            });
+                        }}
+                    />
                 )}
             </div>
 
