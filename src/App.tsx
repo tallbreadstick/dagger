@@ -179,6 +179,8 @@ export default function App() {
                             <Sidebar
                                 currentTab={currentTab}
                                 setCurrentTab={setCurrentTab}
+                                width={sidebarWidth()}
+                                setWidth={setSidebarWidth}
                             />
                             {/* Resizer handle — inside same flex group for consistent layout */}
                             <div

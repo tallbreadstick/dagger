@@ -29,7 +29,7 @@ export default function TitleBar() {
             <div class="flex items-center gap-2 pl-2">
                 {/* Replace with your own SVG/logo */}
                 <img data-tauri-drag-region src={DaggerIcon} class="w-5 h-5" />
-                <span data-tauri-drag-region class="text-sm font-medium">Dagger File Search Engine</span>
+                <span data-tauri-drag-region class="text-sm font-medium">Dagger File Explorer</span>
             </div>
 
             {/* Right: Window Controls */}
