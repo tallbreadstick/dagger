@@ -129,35 +129,35 @@ pub fn register_recent_access(handle: AppHandle, path: &str) -> Result<(), Strin
 // }
 
 /// Helper to read immediate directory contents
-fn read_dir_safe(path: &str) -> Vec<FileNode> {
-    if let Ok(entries) = fs::read_dir(path) {
-        let mut nodes: Vec<FileNode> = entries
-            .filter_map(|entry| {
-                let entry = entry.ok()?;
-                let meta = entry.metadata().ok()?;
-                let is_dir = meta.is_dir();
-                let name = entry.file_name().to_string_lossy().to_string();
-                let path = entry.path().to_string_lossy().to_string();
-                Some(FileNode {
-                    name,
-                    path,
-                    is_dir,
-                    children: if is_dir { Some(vec![]) } else { None },
-                })
-            })
-            .collect();
+// fn read_dir_safe(path: &str) -> Vec<FileNode> {
+//     if let Ok(entries) = fs::read_dir(path) {
+//         let mut nodes: Vec<FileNode> = entries
+//             .filter_map(|entry| {
+//                 let entry = entry.ok()?;
+//                 let meta = entry.metadata().ok()?;
+//                 let is_dir = meta.is_dir();
+//                 let name = entry.file_name().to_string_lossy().to_string();
+//                 let path = entry.path().to_string_lossy().to_string();
+//                 Some(FileNode {
+//                     name,
+//                     path,
+//                     is_dir,
+//                     children: if is_dir { Some(vec![]) } else { None },
+//                 })
+//             })
+//             .collect();
 
-        nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-        });
+//         nodes.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+//             (true, false) => std::cmp::Ordering::Less,
+//             (false, true) => std::cmp::Ordering::Greater,
+//             _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+//         });
 
-        nodes
-    } else {
-        vec![]
-    }
-}
+//         nodes
+//     } else {
+//         vec![]
+//     }
+// }
 
 /// Recursively builds tree along a path from root to target
 #[tauri::command]

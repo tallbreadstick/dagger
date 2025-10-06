@@ -1,10 +1,9 @@
-import { createEffect, createSignal, For, Show } from "solid-js";
+import { createEffect, createSignal, For, Show, onMount } from "solid-js";
 import { listDirectoryContents, FileNode } from "../../scripts/navigation";
 import {
     FaSolidFolder,
     FaSolidFolderOpen,
     FaSolidFile,
-    FaSolidFilePdf,
     FaSolidFileWord,
     FaSolidFileExcel,
     FaSolidBoxArchive,
@@ -26,12 +25,46 @@ export function TreeNode(props: {
     const [expanded, setExpanded] = createSignal(false);
     const [children, setChildren] = createSignal<FileNode[]>(props.node.children ?? []);
     const [loading, setLoading] = createSignal(false);
+    let nodeRef: HTMLDivElement | undefined;
 
-    createEffect(() => {
-        if (props.workingDir.startsWith(props.node.path)) {
+    // Auto-expand if part of working directory
+    createEffect(async () => {
+        const isWithinPath = props.workingDir.startsWith(props.node.path);
+        const isExactPath = props.workingDir === props.node.path;
+
+        if (isWithinPath) {
             setExpanded(true);
+
+            // If this node *is* the working directory itself, load its children if not loaded yet
+            if (isExactPath && props.node.is_dir && children().length === 0 && !loading()) {
+                await loadChildren();
+            }
         } else {
             setExpanded(false);
+        }
+    });
+
+    // Scroll into view ONLY if this node *is* the active working directory.
+    // Wait a couple of animation frames so nested children have time to render
+    // after expansion — avoids the "layout shifts after scroll" problem.
+    createEffect(() => {
+    if (props.workingDir === props.node.path && nodeRef) {
+        // two RAFs are a reliable, lightweight way to wait for nested renders/paint
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                nodeRef!.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        });
+    }
+    });
+
+    // Expand and preload children on mount if needed
+    onMount(async () => {
+        if (props.node.is_dir && props.workingDir.startsWith(props.node.path)) {
+            setExpanded(true);
+            if (children().length === 0) {
+                await loadChildren();
+            }
         }
     });
 
@@ -60,12 +93,11 @@ export function TreeNode(props: {
         if (!props.node.is_dir) return;
 
         if (!expanded()) {
+            // Collapse other siblings
             if (props.parentChildren && props.parentSetChildren) {
                 const siblings = props.parentChildren();
                 const updatedSiblings = siblings.map((sib) => {
-                    if (sib !== props.node && sib.children) {
-                        return { ...sib }; // actual collapse handled by child signals
-                    }
+                    if (sib !== props.node) return { ...sib, children: sib.children };
                     return sib;
                 });
                 props.parentSetChildren(updatedSiblings);
@@ -85,14 +117,12 @@ export function TreeNode(props: {
         if (props.node.is_dir) {
             props.onNavigate(props.node.path);
         } else {
-            // Open non-directory files
             openPath(props.node.path).catch((err) => {
                 console.error("Failed to open file:", err);
             });
         }
     }
 
-    // Return the proper icon component for a file based on its extension
     function getFileIcon(name: string) {
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
 
@@ -112,13 +142,20 @@ export function TreeNode(props: {
         if (archiveExts.includes(ext)) return <FaSolidBoxArchive class="text-yellow-400 w-3 h-3" />;
         if (execExts.includes(ext)) return <FaSolidFileCode class="text-red-400 w-3 h-3" />;
 
-        return <FaSolidFile class="text-gray-500 w-3 h-3" />; // fallback
+        return <FaSolidFile class="text-gray-500 w-3 h-3" />;
     }
+
+    const isActive = () => props.workingDir === props.node.path;
 
     return (
         <div class="select-none">
             <div
-                class="flex items-center gap-1 cursor-pointer hover:bg-white/10 active:bg-white/20 px-2 py-1 rounded-md transition-colors"
+                ref={nodeRef}
+                class={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded-md transition-colors ${
+                    isActive()
+                        ? "bg-blue-500/30 text-white font-semibold"
+                        : "hover:bg-white/10 active:bg-white/20 text-black"
+                }`}
                 style={{ "padding-left": `${props.depth * 14}px` }}
                 onClick={toggleExpand}
                 onDblClick={handleDoubleClick}
@@ -128,7 +165,7 @@ export function TreeNode(props: {
                         <FaSolidFolderOpen class="text-gray-50 w-3 h-3" />
                     </Show>
                 </Show>
-                <span class="truncate text-sm text-black">{props.node.name || props.node.path}</span>
+                <span class="truncate text-sm">{props.node.name || props.node.path}</span>
             </div>
 
             <Show when={expanded()}>

@@ -36,12 +36,12 @@ export default function NavigationBar(props: {
     });
 
     // helpers to force a store update after a Tab method mutates internal fields.
-    function triggerEntryUpdate(entry: TabEntry | null) {
-        if (!entry) return;
-        // Call setTab with an identity updater to notify Solid the object changed.
-        // This is needed because class method mutations are not always tracked automatically.
-        entry.setTab((prev) => prev as any);
-    }
+    // function triggerEntryUpdate(entry: TabEntry | null) {
+    //     if (!entry) return;
+    //     // Call setTab with an identity updater to notify Solid the object changed.
+    //     // This is needed because class method mutations are not always tracked automatically.
+    //     entry.setTab((prev) => prev as any);
+    // }
 
     // helpers to force a store update safely
     function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
