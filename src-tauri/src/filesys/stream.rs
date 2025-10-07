@@ -123,7 +123,7 @@ pub async fn stream_directory_contents(
                                 ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format()
                             {
                                 if let Ok(img) = reader.decode() {
-                                    let thumb = img.thumbnail(64, 64);
+                                    let thumb = img.resize(128, 128, image::imageops::FilterType::Nearest);
                                     let mut buf = Vec::new();
                                     if thumb
                                         .write_to(
