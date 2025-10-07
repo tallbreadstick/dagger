@@ -3,7 +3,6 @@ use std::sync::Arc;
 #[cfg(target_os = "windows")]
 use tauri::Emitter;
 use tauri::Manager;
-use tokio::sync::RwLock;
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 pub mod filesys;

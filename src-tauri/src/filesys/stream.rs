@@ -6,7 +6,8 @@ use std::{
     },
     time::Duration,
 };
-use image::io::Reader as ImageReader;
+use base64::{engine::GeneralPurpose, Engine};
+use image::ImageReader;
 use jwalk::WalkDir;
 use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
@@ -39,6 +40,10 @@ pub async fn stream_directory_contents(
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
+    // base64 encoder for thumbnails
+    let encoder = GeneralPurpose::new(&base64::alphabet::STANDARD, base64::engine::general_purpose::PAD); 
+
+    // walker pool — lightweight tasks
     let pool_ref = pool.inner().clone();
     let walker = WalkDir::new(&path)
         .max_depth(1) // only the top-level directory
@@ -132,7 +137,7 @@ pub async fn stream_directory_contents(
                                         )
                                         .is_ok()
                                     {
-                                        Some(base64::encode(&buf))
+                                        Some(encoder.encode(&buf))
                                     } else {
                                         None
                                     }
