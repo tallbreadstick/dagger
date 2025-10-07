@@ -76,7 +76,6 @@ export default function ContentPanel(props: {
         );
 
         cancelStream = async () => {
-            // await cancelCurrentStream();
             unlisten();
         };
     };
@@ -171,7 +170,7 @@ export default function ContentPanel(props: {
 
     return (
         <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
-            <Show when={true} fallback={<div class="text-gray-500">Loading...</div>}>
+            <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
                 <div
                     class={`${props.viewMode === 'grid'
                         ? 'grid gap-3 justify-items-center'

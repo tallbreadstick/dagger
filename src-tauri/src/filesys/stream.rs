@@ -1,8 +1,15 @@
-use std::{path::Path, sync::{atomic::{AtomicBool, AtomicU64, Ordering}, Arc}};
+use std::{
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
+    time::{Duration, SystemTime},
+};
 use image::io::Reader as ImageReader;
-use image::imageops::FilterType;
+use jwalk::WalkDir;
+use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
-use tokio::sync::RwLock;
 
 pub struct StreamState {
     pub current_id: AtomicU64,
@@ -27,40 +34,49 @@ pub async fn stream_directory_contents(
     ascending: bool,
     request_id: u64,
 ) -> Result<(), String> {
-    // set active id + un-cancel
+    // mark new stream as active
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
-    let mut entries = tokio::fs::read_dir(&path).await.map_err(|e| e.to_string())?;
-    let mut items = Vec::new();
+    let walker = WalkDir::new(&path)
+        .max_depth(1) // only the top-level directory
+        .follow_links(false)
+        .skip_hidden(false)
+        .parallelism(jwalk::Parallelism::RayonDefaultPool { busy_timeout: Duration::from_millis(20) });
 
-    // Collect entries (quick IO awaits here)
-    while let Ok(Some(entry)) = entries.next_entry().await {
-        // cheap atomic check — no await
-        if state.cancelled.load(Ordering::Relaxed)
-            || state.current_id.load(Ordering::Relaxed) != request_id
-        {
-            println!("Cancelled while collecting for {}", path);
-            return Ok(());
-        }
+    // collect basic file data in parallel
+    let mut items: Vec<_> = walker
+        .into_iter()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| {
+            // check cancel before doing any metadata
+            if state.cancelled.load(Ordering::Relaxed)
+                || state.current_id.load(Ordering::Relaxed) != request_id
+            {
+                return None;
+            }
 
-        if let Ok(meta) = entry.metadata().await {
+            let meta = entry.metadata().ok()?;
             let is_dir = meta.is_dir();
             let size = if !is_dir { Some(meta.len()) } else { None };
-            let name = entry.file_name().to_string_lossy().to_string();
+            let name = entry.file_name.to_string_lossy().to_string();
             let path_str = entry.path().to_string_lossy().to_string();
-            let filetype = entry.path().extension()
+            let filetype = entry
+                .path()
+                .extension()
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_default();
             let modified = meta.modified().ok();
 
-            items.push((name, path_str, is_dir, size, filetype, modified));
-        }
-    }
+            Some((name, path_str, is_dir, size, filetype, modified))
+        })
+        .collect();
 
-    // sorting as before...
+    // sort results
     items.sort_by(|a, b| {
-        if a.2 != b.2 { return b.2.cmp(&a.2); }
+        if a.2 != b.2 {
+            return b.2.cmp(&a.2);
+        }
         let ord = match sort_key.as_str() {
             "name" => a.0.to_lowercase().cmp(&b.0.to_lowercase()),
             "size" => a.3.cmp(&b.3),
@@ -71,64 +87,84 @@ pub async fn stream_directory_contents(
         if ascending { ord } else { ord.reverse() }
     });
 
-    for (name, path_str, is_dir, size, filetype, _modified) in items {
-        // cheap atomic check before heavy work
-        if state.cancelled.load(Ordering::Relaxed)
-            || state.current_id.load(Ordering::Relaxed) != request_id
-        {
-            println!("Cancelled mid-stream for {}", path);
-            return Ok(());
-        }
-
-        let ext = Path::new(&path_str)
-            .extension()
-            .map(|s| s.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-
-        // Only perform expensive read/decode if still current
-        let thumbnail = if !is_dir && ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str()) {
-            // re-check before reading
+    // thumbnail generation pool — heavy tasks
+    let results: Vec<_> = items
+        .into_par_iter() // rayon parallel loop
+        .filter_map(|(name, path_str, is_dir, size, filetype, modified)| {
             if state.cancelled.load(Ordering::Relaxed)
                 || state.current_id.load(Ordering::Relaxed) != request_id
             {
-                None
-            } else {
-                match tokio::fs::read(&path_str).await {
-                    Ok(bytes) => {
-                        if state.cancelled.load(Ordering::Relaxed)
-                            || state.current_id.load(Ordering::Relaxed) != request_id
-                        {
-                            None
-                        } else if let Ok(reader) = ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
-                            match reader.decode() {
-                                Ok(img) => {
-                                    // run thumbnail quickly
+                return None;
+            }
+
+            let ext = Path::new(&path_str)
+                .extension()
+                .map(|s| s.to_string_lossy().to_lowercase())
+                .unwrap_or_default();
+
+            let thumbnail = if !is_dir
+                && ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str())
+            {
+                // lightweight cancellation re-check
+                if state.cancelled.load(Ordering::Relaxed)
+                    || state.current_id.load(Ordering::Relaxed) != request_id
+                {
+                    None
+                } else {
+                    match std::fs::read(&path_str) {
+                        Ok(bytes) => {
+                            if let Ok(reader) =
+                                ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format()
+                            {
+                                if let Ok(img) = reader.decode() {
                                     let thumb = img.thumbnail(128, 128);
                                     let mut buf = Vec::new();
-                                    if thumb.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg).is_ok() {
+                                    if thumb
+                                        .write_to(
+                                            &mut std::io::Cursor::new(&mut buf),
+                                            image::ImageFormat::Jpeg,
+                                        )
+                                        .is_ok()
+                                    {
                                         Some(base64::encode(&buf))
-                                    } else { None }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
                                 }
-                                Err(_) => None,
+                            } else {
+                                None
                             }
-                        } else { None }
+                        }
+                        Err(_) => None,
                     }
-                    Err(_) => None,
                 }
-            }
-        } else {
-            None
-        };
+            } else {
+                None
+            };
 
-        // final cheap check right before emit
+            Some((
+                name,
+                path_str,
+                is_dir,
+                size,
+                filetype,
+                thumbnail,
+                modified,
+            ))
+        })
+        .collect();
+
+    // emit results back in order
+    for (name, path_str, is_dir, size, filetype, thumbnail, modified) in results {
         if state.cancelled.load(Ordering::Relaxed)
             || state.current_id.load(Ordering::Relaxed) != request_id
         {
-            println!("Cancelled right before emit for {}", path);
+            println!("Cancelled before emit for {}", path);
             return Ok(());
         }
 
-        // include request_id in the payload
         let _ = handle.emit("file-chunk", serde_json::json!({
             "request_id": request_id,
             "name": name,
@@ -137,25 +173,21 @@ pub async fn stream_directory_contents(
             "size": size,
             "filetype": filetype,
             "thumbnail": thumbnail,
-            "date_modified": _modified
+            "date_modified": modified
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_secs()),
         }));
     }
 
-    // completion only if still current
+    // final completion
     if !state.cancelled.load(Ordering::Relaxed)
         && state.current_id.load(Ordering::Relaxed) == request_id
     {
-        let _ = handle.emit("file-chunk-complete", serde_json::json!({ "request_id": request_id, "path": path }));
+        let _ = handle.emit(
+            "file-chunk-complete",
+            serde_json::json!({ "request_id": request_id, "path": path }),
+        );
     }
 
     Ok(())
 }
-
-// #[tauri::command]
-// pub async fn cancel_current_stream(state: State<'_, Arc<RwLock<StreamState>>>) -> Result<(), String> {
-//     let s = state.read().await;
-//     s.cancelled.store(true, Ordering::Relaxed);
-//     Ok(())
-// }

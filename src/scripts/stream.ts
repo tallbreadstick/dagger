@@ -1,6 +1,6 @@
 // src/tauri/stream.ts
 import { invoke } from '@tauri-apps/api/core';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
 
 export type FileChunk = {
     name: string;
@@ -55,11 +55,7 @@ export async function streamDirectoryContents(
     });
 
     return async () => {
-        await unlistenChunk();
-        await unlistenComplete();
+        unlistenChunk();
+        unlistenComplete();
     };
 }
-
-// export async function cancelCurrentStream() {
-//     await invoke('cancel_current_stream');
-// }
