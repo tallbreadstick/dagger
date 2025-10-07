@@ -15,6 +15,7 @@ import { useWindowFocusEvents } from "./scripts/events";
 import { useGlobalShortcuts } from "./scripts/shortcuts";
 import { createStore, SetStoreFunction } from "solid-js/store";
 import Tab from "./classes/Tab";
+import ActionBar from "./components/content/ActionBar";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -183,26 +184,24 @@ export default function App() {
                                 setWidth={setSidebarWidth}
                             />
                             {/* Resizer handle — inside same flex group for consistent layout */}
-                            <div
+                            {/* <div
                                 onMouseDown={startResize}
                                 class="w-1 cursor-col-resize bg-transparent hover:bg-white/20 active:bg-white/40 transition-colors duration-150"
                                 style={{
                                     "user-select": "none",
                                     "touch-action": "none",
                                 }}
-                            />
+                            /> */}
                         </div>
 
                         {/* Main content area */}
-                        <div class="flex-1 min-w-0 overflow-auto">
-                            {/* Your file view */}
+                        <div class="flex-1 min-w-0 overflow-auto flex flex-col">
+                            <ActionBar />
+                            {/* ContentPanel below */}
+                            <div class="flex-1 overflow-auto">
+                                {/* Content panel code goes here */}
+                            </div>
                         </div>
-                    </div>
-
-
-                    {/* Main View */}
-                    <div class="flex-1 min-w-0 overflow-auto">
-                        {/* your file view, editor, etc. */}
                     </div>
                 </div>
             </div>

@@ -34,7 +34,7 @@ fn get_cache_dir(handle: &AppHandle) -> PathBuf {
     let mut dir = handle.path()
         .app_data_dir()
         .unwrap();
-    dir.push("PenSpecter");
+    dir.push("Dagger");
     fs::create_dir_all(&dir).ok();
     dir
 }
