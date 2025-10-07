@@ -58,7 +58,7 @@ export default function SortMenu(props: {
 
             <div class="border-t border-gray-200 mt-1 pt-1">
                 <button
-                    onClick={() => props.setAscending(!props)}
+                    onClick={() => props.setAscending(!props.ascending)}
                     class="flex w-full justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
                 >
                     <span>Order</span>

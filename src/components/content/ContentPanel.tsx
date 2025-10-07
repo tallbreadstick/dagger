@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, For, Show } from "solid-js";
+import { createSignal, createEffect, onCleanup, For, Show, Accessor } from "solid-js";
 import { Portal } from "solid-js/web";
 import type { TabEntry } from "../../App";
 import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
@@ -21,13 +21,11 @@ import { LazyImage } from "../LazyImage";
 export default function ContentPanel(props: {
     currentTab: TabEntry | null;
     setCurrentTab: (entry: TabEntry) => void;
-    sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
-    setSortKey: (key: 'name' | 'size' | 'filetype' | 'date_modified') => void;
-    ascending: boolean;
-    setAscending: (v: boolean) => void;
-    viewMode: 'grid' | 'list';
-    showHidden: boolean;
-    showExtensions: boolean;
+    sortKey: Accessor<'name' | 'size' | 'filetype' | 'date_modified'>;
+    ascending: Accessor<boolean>;
+    viewMode: Accessor<'grid' | 'list'>;
+    showHidden: Accessor<boolean>;
+    showExtensions: Accessor<boolean>;
 }) {
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
@@ -93,7 +91,7 @@ export default function ContentPanel(props: {
                 setTimeout(() => setShowProgress(false), 400);
                 cancelStream = null;
             },
-            { sortKey: props.sortKey, ascending: props.ascending }
+            { sortKey: props.sortKey(), ascending: props.ascending() }
         );
 
         cancelStream = async () => {
@@ -102,9 +100,12 @@ export default function ContentPanel(props: {
         };
     };
 
-    createEffect(() => {
+    createEffect(async () => {
         const path = props.currentTab?.tab.workingDir;
-        if (path) loadDirectory(path);
+        props.sortKey();
+        props.ascending();
+        props.showHidden();
+        if (path) await loadDirectory(path);
         else setFiles([]);
     });
 
@@ -116,7 +117,7 @@ export default function ContentPanel(props: {
         const name = file.name;
 
         if (file.is_dir) {
-            return <FaSolidFolder class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-300 mb-1`} />;
+            return <FaSolidFolder class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-300 mb-1`} />;
         }
 
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
@@ -136,22 +137,22 @@ export default function ContentPanel(props: {
                 <LazyImage
                     src={`data:image;base64,${file.thumbnail}`}
                     alt={name}
-                    class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
+                    class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
                 />
             );
         }
 
-        if (docExts.includes(ext)) return <FaSolidFileWord class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-400 mb-1`} />;
-        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-orange-400 mb-1`} />;
-        if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-green-400 mb-1`} />;
-        if (videoExts.includes(ext)) return <FaSolidFileVideo class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-purple-400 mb-1`} />;
-        if (audioExts.includes(ext)) return <FaSolidFileAudio class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-indigo-400 mb-1`} />;
-        if (imageExts.includes(ext)) return <FaSolidFileImage class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-pink-400 mb-1`} />;
-        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-yellow-400 mb-1`} />;
-        if (execExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-red-400 mb-1`} />;
-        if (codeExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-600 mb-1`} />;
+        if (docExts.includes(ext)) return <FaSolidFileWord class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-400 mb-1`} />;
+        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-orange-400 mb-1`} />;
+        if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-green-400 mb-1`} />;
+        if (videoExts.includes(ext)) return <FaSolidFileVideo class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-purple-400 mb-1`} />;
+        if (audioExts.includes(ext)) return <FaSolidFileAudio class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-indigo-400 mb-1`} />;
+        if (imageExts.includes(ext)) return <FaSolidFileImage class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-pink-400 mb-1`} />;
+        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-yellow-400 mb-1`} />;
+        if (execExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-red-400 mb-1`} />;
+        if (codeExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-600 mb-1`} />;
 
-        return <FaSolidFile class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
+        return <FaSolidFile class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
     }
 
     const formatDate = (dateStr?: string) => {
@@ -202,14 +203,14 @@ export default function ContentPanel(props: {
                     />
                 </div>
             </Show>
-            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">    
+            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
 
                 <Show when={!loading()}>
                     <div
-                        class={`${props.viewMode === 'grid'
+                        class={`${props.viewMode() === 'grid'
                             ? 'grid gap-3 justify-items-center'
                             : 'flex flex-col gap-1'}`}
-                        style={props.viewMode === 'grid'
+                        style={props.viewMode() === 'grid'
                             ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));'
                             : undefined}
                     >
@@ -217,12 +218,12 @@ export default function ContentPanel(props: {
                             {(file) => (
                                 <div
                                     onDblClick={() => handleDoubleClick(file)}
-                                    class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                    class={`flex ${props.viewMode() === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
                                     title={file.name}
                                 >
                                     {getFileIcon(file)}
 
-                                    {props.viewMode === 'grid' ? (
+                                    {props.viewMode() === 'grid' ? (
                                         <div class="text-center mt-1 w-full">
                                             <div class="truncate text-xs">{file.name}</div>
                                         </div>

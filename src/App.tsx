@@ -223,13 +223,11 @@ export default function App() {
                                 <ContentPanel
                                     currentTab={currentTab()}
                                     setCurrentTab={setCurrentTab}
-                                    sortKey={sortKey()}
-                                    setSortKey={setSortKey}
-                                    ascending={ascending()}
-                                    setAscending={setAscending}
-                                    viewMode={viewMode()}
-                                    showHidden={showHidden()}
-                                    showExtensions={showExtensions()}
+                                    sortKey={sortKey}
+                                    ascending={ascending}
+                                    viewMode={viewMode}
+                                    showHidden={showHidden}
+                                    showExtensions={showExtensions}
                                 />
                             </div>
                         </div>
