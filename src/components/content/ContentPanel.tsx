@@ -111,6 +111,13 @@ export default function ContentPanel(props: {
         return <FaSolidFile class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
     }
 
+    const formatDate = (dateStr?: string) => {
+        if (!dateStr) return "";
+        const d = new Date(dateStr);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ` +
+            `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+
     function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
         if (!entry) return;
         const newTab = updater(entry.tab);
@@ -140,22 +147,41 @@ export default function ContentPanel(props: {
     };
 
     return (
-        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 scrollbar-track-transparent">
+        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
             <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
                 <div class={`${props.viewMode === 'grid' ? 'grid grid-cols-8 gap-3' : 'flex flex-col gap-1'}`}>
                     <For each={files()}>
                         {(file) => (
                             <div
                                 onDblClick={() => handleDoubleClick(file)}
-                                class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center gap-4 p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
                                 title={file.name}
                             >
                                 {getFileIcon(file)}
-                                <div class={`${props.viewMode === 'grid' ? 'text-center mt-1 w-full' : 'flex-1 flex flex-col justify-center min-w-0'}`}>
-                                    <div class="truncate overflow-hidden text-xs whitespace-nowrap w-full min-w-0">
-                                        {file.name}
+
+                                {props.viewMode === 'grid' ? (
+                                    <div class="text-center mt-1 w-full">
+                                        <div class="truncate text-xs">{file.name}</div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
+                                        {/* Name column */}
+                                        <div class="flex-1 truncate">{file.name}</div>
+
+                                        {/* Type column */}
+                                        <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
+
+                                        {/* Size column */}
+                                        <div class="w-24 text-right ml-6">
+                                            {!file.is_dir && file.size != null
+                                                ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
+                                                : '-'}
+                                        </div>
+
+                                        {/* Date modified column */}
+                                        <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </For>
