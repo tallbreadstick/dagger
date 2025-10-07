@@ -17,6 +17,8 @@ export type StreamOptions = {
     ascending?: boolean;
 };
 
+let currentStreamId = 0;
+
 /**
  * Stream a directory's contents from the Tauri backend.
  * @param path Directory path to stream
@@ -25,38 +27,39 @@ export type StreamOptions = {
  * @param options Optional sorting configuration
  * @returns A function to unsubscribe/cancel the stream
  */
+
 export async function streamDirectoryContents(
     path: string,
     onChunk: (chunk: FileChunk) => void,
-    onComplete?: () => void,
-    options?: StreamOptions
-): Promise<UnlistenFn> {
+    onComplete: () => void,
+    options: StreamOptions
+) {
     const { sortKey = 'name', ascending = true } = options || {};
+    const requestId = ++currentStreamId;
 
-    // Listen to individual file chunks
-    const unlistenChunk = await listen<FileChunk>('file-chunk', (event) => {
-        if (event.payload) {
-            onChunk(event.payload);
-        }
+    const unlistenChunk = await listen('file-chunk', (event) => {
+        const payload = event.payload as any;
+        if (!payload) return;
+        if (payload.request_id !== requestId) return; // IGNORE stale chunks
+        onChunk(payload);
     });
 
-    // Listen to stream completion
-    const unlistenComplete = await listen<{ path: string }>('file-chunk-complete', (event) => {
-        if (event.payload?.path === path) {
-            onComplete?.();
-        }
+    const unlistenComplete = await listen('file-chunk-complete', (event) => {
+        const payload = event.payload as any;
+        if (payload?.request_id !== requestId) return;
+        if (payload?.path === path) onComplete?.();
     });
 
-    // Invoke the backend stream command
     await invoke('stream_directory_contents', {
-        path,
-        sortKey,
-        ascending,
+        path, sortKey, ascending, requestId
     });
 
-    // Return a single function to cancel both listeners
     return async () => {
         await unlistenChunk();
         await unlistenComplete();
     };
 }
+
+// export async function cancelCurrentStream() {
+//     await invoke('cancel_current_stream');
+// }

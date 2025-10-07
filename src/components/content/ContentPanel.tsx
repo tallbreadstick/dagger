@@ -16,6 +16,7 @@ import {
     FaSolidFolder
 } from "solid-icons/fa";
 import Tab from "../../classes/Tab";
+import { LazyImage } from "../LazyImage";
 
 export default function ContentPanel(props: {
     currentTab: TabEntry | null;
@@ -43,13 +44,31 @@ export default function ContentPanel(props: {
             cancelStream = null;
         }
 
+        const pendingChunks: FileChunk[] = [];
+        let rafScheduled = false;
+
+        function scheduleUpdate() {
+            if (!rafScheduled) {
+                rafScheduled = true;
+                requestAnimationFrame(() => {
+                    setFiles(prev => [...prev, ...pendingChunks.splice(0)]);
+                    rafScheduled = false;
+                });
+            }
+        }
+
         const unlisten = await streamDirectoryContents(
             path,
             (chunk: FileChunk) => {
                 if (!props.showHidden && chunk.name.startsWith('.')) return;
-                setFiles(prev => [...prev, chunk]);
+                pendingChunks.push(chunk);
+                scheduleUpdate();
             },
             () => {
+                // Final flush to make sure nothing is left pending
+                if (pendingChunks.length > 0) {
+                    setFiles(prev => [...prev, ...pendingChunks.splice(0)]);
+                }
                 setLoading(false);
                 cancelStream = null;
             },
@@ -57,9 +76,11 @@ export default function ContentPanel(props: {
         );
 
         cancelStream = async () => {
-            await unlisten();
+            // await cancelCurrentStream();
+            unlisten();
         };
     };
+
 
     createEffect(() => {
         const path = props.currentTab?.tab.workingDir;
@@ -91,11 +112,13 @@ export default function ContentPanel(props: {
         const codeExts = ["js", "ts", "html", "htm", "css", "scss", "sass", "json", "xml", "yml", "yaml", "toml"];
 
         if ((imageExts.includes(ext) || videoExts.includes(ext)) && file.thumbnail) {
-            return <img
-                src={`data:image;base64,${file.thumbnail}`}
-                alt={name}
-                class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
-            />;
+            return (
+                <LazyImage
+                    src={`data:image;base64,${file.thumbnail}`}
+                    alt={name}
+                    class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
+                />
+            );
         }
 
         if (docExts.includes(ext)) return <FaSolidFileWord class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-400 mb-1`} />;
@@ -148,8 +171,15 @@ export default function ContentPanel(props: {
 
     return (
         <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
-            <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
-                <div class={`${props.viewMode === 'grid' ? 'grid grid-cols-8 gap-3' : 'flex flex-col gap-1'}`}>
+            <Show when={true} fallback={<div class="text-gray-500">Loading...</div>}>
+                <div
+                    class={`${props.viewMode === 'grid'
+                        ? 'grid gap-3 justify-items-center'
+                        : 'flex flex-col gap-1'}`}
+                    style={props.viewMode === 'grid'
+                        ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));'
+                        : undefined}
+                >
                     <For each={files()}>
                         {(file) => (
                             <div
