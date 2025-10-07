@@ -93,17 +93,16 @@ export default function App() {
     }
 
     function removeTabById(id: number) {
-        setTabs((prev) => {
-            const updated = prev.filter((e) => e.tab.id !== id);
-            // if current was removed, set new current
-            const isCurrentRemoved = currentTab()?.tab.id === id;
-            if (updated.length === 0) {
-                // close window if no tabs (same behavior you had)
-                // note: getCurrentWindow used previously; import and use if needed
-            } else if (isCurrentRemoved) {
-                setCurrentTab(updated[0]);
+        setTabs((prev) => prev.filter((e) => e.tab.id !== id));
+
+        // safely update currentTab after store flush
+        queueMicrotask(() => {
+            const remaining = tabs.filter((e) => e.tab.id !== id);
+            if (remaining.length === 0) {
+                setCurrentTab(null); // no tabs left
+            } else if (currentTab()?.tab.id === id) {
+                setCurrentTab(remaining[0]); // switch to first remaining tab
             }
-            return updated;
         });
     }
 
