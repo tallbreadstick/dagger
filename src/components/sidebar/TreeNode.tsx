@@ -11,6 +11,7 @@ import {
     FaSolidFileVideo,
     FaSolidFileImage,
     FaSolidFileCode,
+    FaSolidFilePowerpoint,
 } from "solid-icons/fa";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Portal } from "solid-js/web";
@@ -129,7 +130,8 @@ export function TreeNode(props: {
     function getFileIcon(name: string) {
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
 
-        const docExts = ["pdf","doc","docx","odt","txt","rtf","md","ppt","pptx","odp","pages","tex","log"];
+        const docExts = ["pdf","doc","docx","odt","txt","rtf","md","pages","tex","log"];
+        const presExts = ["ppt","pptx","odp","key","gslides"];
         const sheetExts = ["xls","xlsx","csv","ods","numbers"];
         const videoExts = ["mp4","mov","m4v","mkv","avi","webm","flv","wmv","mpg","mpeg","ogv"];
         const audioExts = ["mp3","wav","ogg","m4a","flac","aac","wma","aiff","alac"];
@@ -139,6 +141,7 @@ export function TreeNode(props: {
         const codeExts = ["js","ts","html","htm","css","scss","sass","json","xml","yml","yaml","toml"];
 
         if (docExts.includes(ext)) return <FaSolidFileWord class="text-blue-400 w-3 h-3" />;
+        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class="text-orange-400 w-3 h-3" />;
         if (sheetExts.includes(ext)) return <FaSolidFileExcel class="text-green-400 w-3 h-3" />;
         if (videoExts.includes(ext)) return <FaSolidFileVideo class="text-purple-400 w-3 h-3" />;
         if (audioExts.includes(ext)) return <FaSolidFileAudio class="text-indigo-400 w-3 h-3" />;
@@ -210,7 +213,7 @@ export function TreeNode(props: {
                             class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
                             onClick={() => setError(null)}
                         >
-                            Exit
+                            Close
                         </button>
                         </div>
                     </div>

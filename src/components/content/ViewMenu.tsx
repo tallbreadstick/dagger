@@ -4,12 +4,19 @@
  * Portal dropdown for toggling file view modes and visual options.
  */
 
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { onCleanup, onMount, Show } from "solid-js";
 
-export default function ViewMenu(props: { onClose: () => void; x: number; y: number }) {
-    const [viewMode, setViewMode] = createSignal("grid");
-    const [showHidden, setShowHidden] = createSignal(false);
-    const [showExtensions, setShowExtensions] = createSignal(true);
+export default function ViewMenu(props: {
+    onClose: () => void;
+    x: number;
+    y: number;
+    viewMode: 'grid' | 'list';
+    setViewMode: (v: 'grid' | 'list') => void;
+    showHidden: boolean;
+    setShowHidden: (v: boolean) => void;
+    showExtensions: boolean;
+    setShowExtensions: (v: boolean) => void;
+}) {
 
     onMount(() => {
         const handleEsc = (e: KeyboardEvent) => e.key === "Escape" && props.onClose();
@@ -30,23 +37,23 @@ export default function ViewMenu(props: { onClose: () => void; x: number; y: num
             </div>
 
             <button
-                onClick={() => setViewMode("grid")}
-                class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${viewMode() === "grid" ? "bg-gray-100 font-medium" : ""
+                onClick={() => props.setViewMode("grid")}
+                class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${props.viewMode === "grid" ? "bg-gray-100 font-medium" : ""
                     }`}
             >
                 Grid View
-                <Show when={viewMode() === "grid"}>
+                <Show when={props.viewMode === "grid"}>
                     <span class="text-gray-500 text-xs">✓</span>
                 </Show>
             </button>
 
             <button
-                onClick={() => setViewMode("list")}
-                class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${viewMode() === "list" ? "bg-gray-100 font-medium" : ""
+                onClick={() => props.setViewMode("list")}
+                class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${props.viewMode === "list" ? "bg-gray-100 font-medium" : ""
                     }`}
             >
                 List View
-                <Show when={viewMode() === "list"}>
+                <Show when={props.viewMode === "list"}>
                     <span class="text-gray-500 text-xs">✓</span>
                 </Show>
             </button>
@@ -54,13 +61,13 @@ export default function ViewMenu(props: { onClose: () => void; x: number; y: num
             <div class="border-t border-gray-200 mt-1 pt-1">
                 <ToggleOption
                     label="Show Hidden Files"
-                    checked={showHidden()}
-                    onToggle={() => setShowHidden((v) => !v)}
+                    checked={props.showHidden}
+                    onToggle={() => props.setShowHidden(!props.showHidden)}
                 />
                 <ToggleOption
                     label="Show File Extensions"
-                    checked={showExtensions()}
-                    onToggle={() => setShowExtensions((v) => !v)}
+                    checked={props.showExtensions}
+                    onToggle={() => props.setShowExtensions(!props.showExtensions)}
                 />
             </div>
         </div>

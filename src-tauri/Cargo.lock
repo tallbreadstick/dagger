@@ -762,6 +762,7 @@ dependencies = [
 name = "dagger"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "notify",
  "ort",
  "rfd",
@@ -771,6 +772,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-opener",
+ "tokio",
  "walkdir",
  "window-vibrancy",
 ]

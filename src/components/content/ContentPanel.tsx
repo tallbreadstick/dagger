@@ -1,0 +1,181 @@
+import { createSignal, createEffect, onCleanup, For, Show } from "solid-js";
+import { Portal } from "solid-js/web";
+import type { TabEntry } from "../../App";
+import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
+import { openPath } from "@tauri-apps/plugin-opener";
+import {
+    FaSolidFile,
+    FaSolidFileWord,
+    FaSolidFileExcel,
+    FaSolidFileVideo,
+    FaSolidFileAudio,
+    FaSolidFileImage,
+    FaSolidBoxArchive,
+    FaSolidFileCode,
+    FaSolidFilePowerpoint,
+    FaSolidFolder
+} from "solid-icons/fa";
+import Tab from "../../classes/Tab";
+
+export default function ContentPanel(props: {
+    currentTab: TabEntry | null;
+    setCurrentTab: (entry: TabEntry) => void;
+    sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
+    setSortKey: (key: 'name' | 'size' | 'filetype' | 'date_modified') => void;
+    ascending: boolean;
+    setAscending: (v: boolean) => void;
+    viewMode: 'grid' | 'list';
+    showHidden: boolean;
+    showExtensions: boolean;
+}) {
+    const [files, setFiles] = createSignal<FileChunk[]>([]);
+    const [loading, setLoading] = createSignal(false);
+    const [error, setError] = createSignal<string | null>(null);
+
+    let cancelStream: (() => Promise<void>) | null = null;
+
+    const loadDirectory = async (path: string) => {
+        setFiles([]);
+        setLoading(true);
+
+        if (cancelStream) {
+            await cancelStream();
+            cancelStream = null;
+        }
+
+        const unlisten = await streamDirectoryContents(
+            path,
+            (chunk: FileChunk) => {
+                if (!props.showHidden && chunk.name.startsWith('.')) return;
+                setFiles(prev => [...prev, chunk]);
+            },
+            () => {
+                setLoading(false);
+                cancelStream = null;
+            },
+            { sortKey: props.sortKey, ascending: props.ascending }
+        );
+
+        cancelStream = async () => {
+            await unlisten();
+        };
+    };
+
+    createEffect(() => {
+        const path = props.currentTab?.tab.workingDir;
+        if (path) loadDirectory(path);
+        else setFiles([]);
+    });
+
+    onCleanup(async () => {
+        if (cancelStream) await cancelStream();
+    });
+
+    function getFileIcon(file: FileChunk) {
+        const name = file.name;
+
+        if (file.is_dir) {
+            return <FaSolidFolder class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-300 mb-1`} />;
+        }
+
+        const ext = name.split(".").pop()?.toLowerCase() ?? "";
+
+        const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md", "pages", "tex", "log"];
+        const presExts = ["ppt", "pptx", "odp", "key", "gslides"];
+        const sheetExts = ["xls", "xlsx", "csv", "ods", "numbers"];
+        const videoExts = ["mp4", "mov", "m4v", "mkv", "avi", "webm", "flv", "wmv", "mpg", "mpeg", "ogv"];
+        const audioExts = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma", "aiff", "alac"];
+        const imageExts = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "svg", "heic", "ico", "psd", "ai", "eps"];
+        const archiveExts = ["zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso", "dmg", "cab", "lzh", "arj"];
+        const execExts = ["exe", "msi", "jar", "bat", "sh", "app", "bin", "command", "run", "py", "pl", "rb"];
+        const codeExts = ["js", "ts", "html", "htm", "css", "scss", "sass", "json", "xml", "yml", "yaml", "toml"];
+
+        if ((imageExts.includes(ext) || videoExts.includes(ext)) && file.thumbnail) {
+            return <img
+                src={`data:image;base64,${file.thumbnail}`}
+                alt={name}
+                class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
+            />;
+        }
+
+        if (docExts.includes(ext)) return <FaSolidFileWord class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-400 mb-1`} />;
+        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-orange-400 mb-1`} />;
+        if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-green-400 mb-1`} />;
+        if (videoExts.includes(ext)) return <FaSolidFileVideo class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-purple-400 mb-1`} />;
+        if (audioExts.includes(ext)) return <FaSolidFileAudio class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-indigo-400 mb-1`} />;
+        if (imageExts.includes(ext)) return <FaSolidFileImage class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-pink-400 mb-1`} />;
+        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-yellow-400 mb-1`} />;
+        if (execExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-red-400 mb-1`} />;
+        if (codeExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-600 mb-1`} />;
+
+        return <FaSolidFile class={`${props.viewMode === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
+    }
+
+    function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
+        if (!entry) return;
+        const newTab = updater(entry.tab);
+        entry.setTab(newTab);
+    }
+
+    function handleNavigate(path: string) {
+        const entry = props.currentTab;
+        if (!entry) return;
+
+        updateTab(entry, (tab) => {
+            const newTab = tab.clone();
+            newTab.navigateTo(path);
+            return newTab;
+        });
+    }
+
+    const handleDoubleClick = (file: FileChunk) => {
+        if (!props.currentTab) return;
+        if (file.is_dir) {
+            handleNavigate(file.path);
+        } else {
+            openPath(file.path).catch((err) => {
+                setError(err);
+            });
+        }
+    };
+
+    return (
+        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 scrollbar-track-transparent">
+            <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
+                <div class={`${props.viewMode === 'grid' ? 'grid grid-cols-8 gap-3' : 'flex flex-col gap-1'}`}>
+                    <For each={files()}>
+                        {(file) => (
+                            <div
+                                onDblClick={() => handleDoubleClick(file)}
+                                class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center gap-4 p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                title={file.name}
+                            >
+                                {getFileIcon(file)}
+                                <div class={`${props.viewMode === 'grid' ? 'text-center mt-1 w-full' : 'flex-1 flex flex-col justify-center min-w-0'}`}>
+                                    <div class="truncate overflow-hidden text-xs whitespace-nowrap w-full min-w-0">
+                                        {file.name}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </For>
+                </div>
+            </Show>
+
+            <Show when={error()}>
+                <Portal>
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
+                            <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
+                            <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
+                            <div class="flex justify-end gap-2">
+                                <button class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm" onClick={() => setError(null)}>OK</button>
+                                <button class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm" onClick={() => setError(null)}>Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </Portal>
+            </Show>
+        </div>
+    );
+}

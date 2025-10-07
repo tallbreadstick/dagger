@@ -4,11 +4,17 @@
  * Portal dropdown for sorting files by various criteria.
  */
 
-import { createSignal, onCleanup, onMount, For, Show } from "solid-js";
+import { onCleanup, onMount, For, Show } from "solid-js";
 
-export default function SortMenu(props: { onClose: () => void; x: number; y: number }) {
-    const [sortBy, setSortBy] = createSignal("name");
-    const [ascending, setAscending] = createSignal(true);
+export default function SortMenu(props: {
+    onClose: () => void;
+    x: number;
+    y: number;
+    sortKey: 'name' | 'size' | 'type' | 'modified';
+    setSortKey: (k: 'name' | 'size' | 'type' | 'modified') => void;
+    ascending: boolean;
+    setAscending: (v: boolean) => void;
+}) {
 
     const options = [
         { key: "name", label: "Name" },
@@ -38,12 +44,12 @@ export default function SortMenu(props: { onClose: () => void; x: number; y: num
             <For each={options}>
                 {(opt) => (
                     <button
-                        onClick={() => setSortBy(opt.key)}
-                        class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${sortBy() === opt.key ? "bg-gray-100 font-medium" : ""
+                        onClick={() => props.setSortKey(opt.key as 'name' | 'size' | 'type' | 'modified')}
+                        class={`flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100 ${props.sortKey === opt.key ? "bg-gray-100 font-medium" : ""
                             }`}
                     >
                         {opt.label}
-                        <Show when={sortBy() === opt.key}>
+                        <Show when={props.sortKey === opt.key}>
                             <span class="text-gray-500 text-xs">✓</span>
                         </Show>
                     </button>
@@ -52,12 +58,12 @@ export default function SortMenu(props: { onClose: () => void; x: number; y: num
 
             <div class="border-t border-gray-200 mt-1 pt-1">
                 <button
-                    onClick={() => setAscending((prev) => !prev)}
+                    onClick={() => props.setAscending(!props)}
                     class="flex w-full justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
                 >
                     <span>Order</span>
                     <span class="text-gray-500 text-xs text-nowrap ml-auto">
-                        {ascending() ? "Ascending ↑" : "Descending ↓"}
+                        {props.ascending ? "Ascending ↑" : "Descending ↓"}
                     </span>
                 </button>
             </div>

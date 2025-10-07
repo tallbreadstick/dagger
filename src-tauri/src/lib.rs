@@ -17,7 +17,8 @@ use crate::{
         register_recent_access,
         list_directory_contents,
         get_tree_from_root,
-        resolve_user
+        resolve_user,
+        stream_directory_contents
     },
     util::cmd::resolve_path_command
 };
@@ -36,6 +37,7 @@ pub fn run() {
             list_directory_contents,
             get_tree_from_root,
             resolve_user,
+            stream_directory_contents,
             // util
             resolve_path_command
         ])

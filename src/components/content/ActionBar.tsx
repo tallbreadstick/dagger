@@ -11,7 +11,18 @@ import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
 import ViewMenu from "./ViewMenu";
 
-export default function ActionBar() {
+export default function ActionBar(props: {
+    sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
+    setSortKey: (key: 'name' | 'size' | 'filetype' | 'date_modified') => void;
+    ascending: boolean;
+    setAscending: (v: boolean) => void;
+    viewMode: 'grid' | 'list';
+    setViewMode: (v: 'grid' | 'list') => void;
+    showHidden: boolean;
+    setShowHidden: (v: boolean) => void;
+    showExtensions: boolean;
+    setShowExtensions: (v: boolean) => void;
+}) {
     const [openMenu, setOpenMenu] = createSignal<null | "new" | "sort" | "view">(null);
     const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
 
@@ -88,6 +99,10 @@ export default function ActionBar() {
                         onClose={() => setOpenMenu(null)}
                         x={menuPos().x}
                         y={menuPos().y}
+                        sortKey={props.sortKey as 'name' | 'size' | 'type' | 'modified'}
+                        setSortKey={props.setSortKey as (k: 'name' | 'size' | 'type' | 'modified') => void}
+                        ascending={props.ascending}
+                        setAscending={props.setAscending}
                     />
                 </Show>
 
@@ -96,8 +111,15 @@ export default function ActionBar() {
                         onClose={() => setOpenMenu(null)}
                         x={menuPos().x}
                         y={menuPos().y}
+                        viewMode={props.viewMode}
+                        setViewMode={props.setViewMode}
+                        showHidden={props.showHidden}
+                        setShowHidden={props.setShowHidden}
+                        showExtensions={props.showExtensions}
+                        setShowExtensions={props.setShowExtensions}
                     />
                 </Show>
+
             </Portal>
         </div>
     );

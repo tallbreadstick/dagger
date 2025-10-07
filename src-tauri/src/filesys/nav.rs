@@ -2,7 +2,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use serde::{Serialize, Deserialize};
-use tauri::{AppHandle, Manager};
+use serde_json::json;
+use tauri::{AppHandle, Manager, Emitter};
 
 /// Represents a single file or directory entry.
 #[derive(Serialize, Deserialize, Clone)]
@@ -12,6 +13,16 @@ pub struct FileItem {
     pub is_dir: bool,
     pub size: Option<u64>,
 }
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FileItemWithThumbnail {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: Option<u64>,
+    pub thumbnail: Option<String>, // base64 PNG data for images, None for non-images
+}
+
 
 /// Represents a folder and its children recursively.
 #[derive(Serialize)]
@@ -257,6 +268,76 @@ pub fn list_directory_contents(path: &str) -> Result<Vec<FileItem>, String> {
     });
 
     Ok(items)
+}
+
+#[tauri::command]
+pub async fn stream_directory_contents(
+    handle: AppHandle,
+    path: String,
+    sort_key: String,        
+    ascending: bool,       
+) -> Result<(), String> {
+    let entries = tokio::fs::read_dir(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let mut items = Vec::new();
+
+    let mut dir_entries = entries;
+    while let Ok(Some(entry)) = dir_entries.next_entry().await {
+        if let Ok(meta) = entry.metadata().await {
+            let is_dir = meta.is_dir();
+            let size = if !is_dir { Some(meta.len()) } else { None };
+            let name = entry.file_name().to_string_lossy().to_string();
+            let path_str = entry.path().to_string_lossy().to_string();
+            let filetype = entry.path().extension()
+                .map(|s| s.to_string_lossy().to_string())
+                .unwrap_or_default();
+            let modified = meta.modified().ok();
+
+            items.push((name, path_str, is_dir, size, filetype, modified));
+        }
+    }
+
+    // Sorting (same as before)
+    items.sort_by(|a, b| {
+        let ord = match sort_key.as_str() {
+            "name" => a.0.to_lowercase().cmp(&b.0.to_lowercase()),
+            "size" => a.3.cmp(&b.3),
+            "filetype" => a.4.to_lowercase().cmp(&b.4.to_lowercase()),
+            "date_modified" => a.5.cmp(&b.5),
+            _ => a.0.to_lowercase().cmp(&b.0.to_lowercase()),
+        };
+        if ascending { ord } else { ord.reverse() }
+    });
+
+    for (name, path_str, is_dir, size, filetype, _modified) in items {
+        let ext = Path::new(&path_str)
+            .extension()
+            .map(|s| s.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        let thumbnail = if !is_dir && ["png","jpg","jpeg","gif","bmp"].contains(&ext.as_str()) {
+            tokio::fs::read(&path_str).await.ok().map(|bytes| base64::encode(&bytes))
+        } else { None };
+
+        if let Err(e) = handle.emit("file-chunk", serde_json::json!({
+            "name": name,
+            "path": path_str,
+            "is_dir": is_dir,
+            "size": size,
+            "filetype": filetype,
+            "thumbnail": thumbnail,
+            "date_modified": _modified.map(|t| t.duration_since(std::time::UNIX_EPOCH).ok().map(|d| d.as_secs())).flatten(),
+        })) {
+            eprintln!("Failed to emit file chunk: {}", e);
+        }
+    }
+
+    handle.emit("file-chunk-complete", serde_json::json!({ "path": path }))
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

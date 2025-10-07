@@ -16,6 +16,7 @@ import { useGlobalShortcuts } from "./scripts/shortcuts";
 import { createStore, SetStoreFunction } from "solid-js/store";
 import Tab from "./classes/Tab";
 import ActionBar from "./components/content/ActionBar";
+import ContentPanel from "./components/content/ContentPanel";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -122,6 +123,15 @@ export default function App() {
         "text" | "image" | "audio" | "document"
     >("text");
 
+    // Sorting
+    const [sortKey, setSortKey] = createSignal<'name' | 'size' | 'filetype' | 'date_modified'>('name');
+    const [ascending, setAscending] = createSignal(true);
+
+    // Viewing
+    const [viewMode, setViewMode] = createSignal<'grid' | 'list'>('grid');
+    const [showHidden, setShowHidden] = createSignal(false);
+    const [showExtensions, setShowExtensions] = createSignal(true);
+
     let focusSearchInput: (() => void) | null = null;
 
     useGlobalShortcuts({
@@ -195,10 +205,32 @@ export default function App() {
 
                         {/* Main content area */}
                         <div class="flex-1 min-w-0 overflow-auto flex flex-col">
-                            <ActionBar />
+                            <ActionBar
+                                sortKey={sortKey()}
+                                setSortKey={setSortKey}
+                                ascending={ascending()}
+                                setAscending={setAscending}
+                                viewMode={viewMode()}
+                                setViewMode={setViewMode}
+                                showHidden={showHidden()}
+                                setShowHidden={setShowHidden}
+                                showExtensions={showExtensions()}
+                                setShowExtensions={setShowExtensions}
+                            />
                             {/* ContentPanel below */}
                             <div class="flex-1 overflow-auto">
                                 {/* Content panel code goes here */}
+                                <ContentPanel
+                                    currentTab={currentTab()}
+                                    setCurrentTab={setCurrentTab}
+                                    sortKey={sortKey()}
+                                    setSortKey={setSortKey}
+                                    ascending={ascending()}
+                                    setAscending={setAscending}
+                                    viewMode={viewMode()}
+                                    showHidden={showHidden()}
+                                    showExtensions={showExtensions()}
+                                />
                             </div>
                         </div>
                     </div>
