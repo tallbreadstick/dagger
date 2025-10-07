@@ -32,12 +32,22 @@ export default function ContentPanel(props: {
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal<string | null>(null);
+    const [progress, setProgress] = createSignal(0);
+    const [showProgress, setShowProgress] = createSignal(false);
+    let startTime: number | null = null;
+    let progressTimer: number | null = null;
 
     let cancelStream: (() => Promise<void>) | null = null;
 
     const loadDirectory = async (path: string) => {
         setFiles([]);
         setLoading(true);
+        setProgress(0);
+        setShowProgress(true);
+        startTime = performance.now();
+
+        // Kill previous simulated progress timer
+        if (progressTimer) cancelAnimationFrame(progressTimer);
 
         if (cancelStream) {
             await cancelStream();
@@ -57,6 +67,17 @@ export default function ContentPanel(props: {
             }
         }
 
+        // 🕒 Fake smooth progress that slows over time
+        function simulateProgress() {
+            if (!startTime) return;
+            const elapsed = (performance.now() - startTime) / 1000; // seconds
+            // Easing: fast start, slow finish
+            const eased = 1 - Math.exp(-0.6 * elapsed);
+            setProgress(Math.min(eased * 0.98, 0.98)); // cap at 98% until real done
+            progressTimer = requestAnimationFrame(simulateProgress);
+        }
+        progressTimer = requestAnimationFrame(simulateProgress);
+
         const unlisten = await streamDirectoryContents(
             path,
             (chunk: FileChunk) => {
@@ -65,11 +86,11 @@ export default function ContentPanel(props: {
                 scheduleUpdate();
             },
             () => {
-                // Final flush to make sure nothing is left pending
-                if (pendingChunks.length > 0) {
-                    setFiles(prev => [...prev, ...pendingChunks.splice(0)]);
-                }
+                // ✅ Real completion
+                if (progressTimer) cancelAnimationFrame(progressTimer);
+                setProgress(1);
                 setLoading(false);
+                setTimeout(() => setShowProgress(false), 400);
                 cancelStream = null;
             },
             { sortKey: props.sortKey, ascending: props.ascending }
@@ -77,9 +98,9 @@ export default function ContentPanel(props: {
 
         cancelStream = async () => {
             unlisten();
+            if (progressTimer) cancelAnimationFrame(progressTimer);
         };
     };
-
 
     createEffect(() => {
         const path = props.currentTab?.tab.workingDir;
@@ -169,68 +190,82 @@ export default function ContentPanel(props: {
     };
 
     return (
-        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
-            <Show when={!loading()} fallback={<div class="text-gray-500">Loading...</div>}>
-                <div
-                    class={`${props.viewMode === 'grid'
-                        ? 'grid gap-3 justify-items-center'
-                        : 'flex flex-col gap-1'}`}
-                    style={props.viewMode === 'grid'
-                        ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));'
-                        : undefined}
-                >
-                    <For each={files()}>
-                        {(file) => (
-                            <div
-                                onDblClick={() => handleDoubleClick(file)}
-                                class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
-                                title={file.name}
-                            >
-                                {getFileIcon(file)}
-
-                                {props.viewMode === 'grid' ? (
-                                    <div class="text-center mt-1 w-full">
-                                        <div class="truncate text-xs">{file.name}</div>
-                                    </div>
-                                ) : (
-                                    <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
-                                        {/* Name column */}
-                                        <div class="flex-1 truncate">{file.name}</div>
-
-                                        {/* Type column */}
-                                        <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
-
-                                        {/* Size column */}
-                                        <div class="w-24 text-right ml-6">
-                                            {!file.is_dir && file.size != null
-                                                ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
-                                                : '-'}
-                                        </div>
-
-                                        {/* Date modified column */}
-                                        <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </For>
+        <div class="flex-1 flex flex-col h-full overflow-hidden">
+            <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
+                <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
+                    <div
+                        class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 to-blue-300 shadow-[0_0_10px_rgba(96,165,250,0.7)] transition-all duration-300 ease-out"
+                        style={{
+                            width: `${progress() * 100}%`,
+                            opacity: progress() >= 1 ? 0 : 1,
+                        }}
+                    />
                 </div>
             </Show>
+            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">    
 
-            <Show when={error()}>
-                <Portal>
-                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                        <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
-                            <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
-                            <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
-                            <div class="flex justify-end gap-2">
-                                <button class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm" onClick={() => setError(null)}>OK</button>
-                                <button class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm" onClick={() => setError(null)}>Close</button>
+                <Show when={!loading()}>
+                    <div
+                        class={`${props.viewMode === 'grid'
+                            ? 'grid gap-3 justify-items-center'
+                            : 'flex flex-col gap-1'}`}
+                        style={props.viewMode === 'grid'
+                            ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));'
+                            : undefined}
+                    >
+                        <For each={files()}>
+                            {(file) => (
+                                <div
+                                    onDblClick={() => handleDoubleClick(file)}
+                                    class={`flex ${props.viewMode === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                    title={file.name}
+                                >
+                                    {getFileIcon(file)}
+
+                                    {props.viewMode === 'grid' ? (
+                                        <div class="text-center mt-1 w-full">
+                                            <div class="truncate text-xs">{file.name}</div>
+                                        </div>
+                                    ) : (
+                                        <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
+                                            {/* Name column */}
+                                            <div class="flex-1 truncate">{file.name}</div>
+
+                                            {/* Type column */}
+                                            <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
+
+                                            {/* Size column */}
+                                            <div class="w-24 text-right ml-6">
+                                                {!file.is_dir && file.size != null
+                                                    ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
+                                                    : '-'}
+                                            </div>
+
+                                            {/* Date modified column */}
+                                            <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </For>
+                    </div>
+                </Show>
+
+                <Show when={error()}>
+                    <Portal>
+                        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                            <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
+                                <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
+                                <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
+                                <div class="flex justify-end gap-2">
+                                    <button class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm" onClick={() => setError(null)}>OK</button>
+                                    <button class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm" onClick={() => setError(null)}>Close</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </Portal>
-            </Show>
+                    </Portal>
+                </Show>
+            </div>
         </div>
     );
 }

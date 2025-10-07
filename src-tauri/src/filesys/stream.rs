@@ -4,7 +4,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 use image::io::Reader as ImageReader;
 use jwalk::WalkDir;
@@ -29,6 +29,7 @@ impl Default for StreamState {
 pub async fn stream_directory_contents(
     handle: AppHandle,
     state: State<'_, Arc<StreamState>>,
+    pool: State<'_, Arc<rayon::ThreadPool>>,
     path: String,
     sort_key: String,
     ascending: bool,
@@ -38,16 +39,21 @@ pub async fn stream_directory_contents(
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
+    let pool_ref = pool.inner().clone();
     let walker = WalkDir::new(&path)
         .max_depth(1) // only the top-level directory
         .follow_links(false)
         .skip_hidden(false)
-        .parallelism(jwalk::Parallelism::RayonDefaultPool { busy_timeout: Duration::from_millis(20) });
+        .parallelism(jwalk::Parallelism::RayonExistingPool {
+            pool: pool_ref,
+            busy_timeout: Some(Duration::from_millis(20))
+        });
 
     // collect basic file data in parallel
     let mut items: Vec<_> = walker
         .into_iter()
         .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.path() != Path::new(&path))
         .filter_map(|entry| {
             // check cancel before doing any metadata
             if state.cancelled.load(Ordering::Relaxed)
@@ -117,7 +123,7 @@ pub async fn stream_directory_contents(
                                 ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format()
                             {
                                 if let Ok(img) = reader.decode() {
-                                    let thumb = img.thumbnail(128, 128);
+                                    let thumb = img.thumbnail(64, 64);
                                     let mut buf = Vec::new();
                                     if thumb
                                         .write_to(

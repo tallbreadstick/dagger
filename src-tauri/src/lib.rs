@@ -36,6 +36,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(StreamState::default()))
+        .manage(Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(8)
+                .build()
+                .unwrap(),
+        ))
         .invoke_handler(tauri::generate_handler![
             // modals
             upload_image_file,
