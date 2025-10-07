@@ -13,6 +13,7 @@ import {
     FaSolidFileCode,
 } from "solid-icons/fa";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { Portal } from "solid-js/web";
 
 export function TreeNode(props: {
     node: FileNode;
@@ -22,6 +23,7 @@ export function TreeNode(props: {
     parentChildren?: () => FileNode[];
     parentSetChildren?: (children: FileNode[]) => void;
 }) {
+    const [error, setError] = createSignal<string | null>(null);
     const [expanded, setExpanded] = createSignal(false);
     const [children, setChildren] = createSignal<FileNode[]>(props.node.children ?? []);
     const [loading, setLoading] = createSignal(false);
@@ -119,6 +121,7 @@ export function TreeNode(props: {
         } else {
             openPath(props.node.path).catch((err) => {
                 console.error("Failed to open file:", err);
+                setError(String(err)); // trigger popup
             });
         }
     }
@@ -126,13 +129,14 @@ export function TreeNode(props: {
     function getFileIcon(name: string) {
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
 
-        const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md"];
-        const sheetExts = ["xls", "xlsx", "csv", "ods"];
-        const videoExts = ["mp4", "mov", "m4v", "mkv", "avi", "webm"];
-        const audioExts = ["mp3", "wav", "ogg", "m4a", "flac", "aac"];
-        const imageExts = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "svg"];
-        const archiveExts = ["zip", "7z", "rar", "tar", "gz", "bz2", "xz"];
-        const execExts = ["exe", "msi", "jar", "bat", "sh", "app", "bin"];
+        const docExts = ["pdf","doc","docx","odt","txt","rtf","md","ppt","pptx","odp","pages","tex","log"];
+        const sheetExts = ["xls","xlsx","csv","ods","numbers"];
+        const videoExts = ["mp4","mov","m4v","mkv","avi","webm","flv","wmv","mpg","mpeg","ogv"];
+        const audioExts = ["mp3","wav","ogg","m4a","flac","aac","wma","aiff","alac"];
+        const imageExts = ["png","jpg","jpeg","gif","bmp","webp","tiff","svg","heic","ico","psd","ai","eps"];
+        const archiveExts = ["zip","7z","rar","tar","gz","bz2","xz","iso","dmg","cab","lzh","arj"];
+        const execExts = ["exe","msi","jar","bat","sh","app","bin","command","run","py","pl","rb"];
+        const codeExts = ["js","ts","html","htm","css","scss","sass","json","xml","yml","yaml","toml"];
 
         if (docExts.includes(ext)) return <FaSolidFileWord class="text-blue-400 w-3 h-3" />;
         if (sheetExts.includes(ext)) return <FaSolidFileExcel class="text-green-400 w-3 h-3" />;
@@ -141,6 +145,7 @@ export function TreeNode(props: {
         if (imageExts.includes(ext)) return <FaSolidFileImage class="text-pink-400 w-3 h-3" />;
         if (archiveExts.includes(ext)) return <FaSolidBoxArchive class="text-yellow-400 w-3 h-3" />;
         if (execExts.includes(ext)) return <FaSolidFileCode class="text-red-400 w-3 h-3" />;
+        if (codeExts.includes(ext)) return <FaSolidFileCode class="text-gray-600 w-3 h-3" />;
 
         return <FaSolidFile class="text-gray-500 w-3 h-3" />;
     }
@@ -187,6 +192,32 @@ export function TreeNode(props: {
                     </For>
                 </div>
             </Show>
+
+            <Show when={error()}>
+                <Portal>
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
+                        <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
+                        <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
+                        <div class="flex justify-end gap-2">
+                        <button
+                            class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+                            onClick={() => setError(null)}
+                        >
+                            OK
+                        </button>
+                        <button
+                            class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                            onClick={() => setError(null)}
+                        >
+                            Exit
+                        </button>
+                        </div>
+                    </div>
+                    </div>
+                </Portal>
+            </Show>
+
         </div>
     );
 }

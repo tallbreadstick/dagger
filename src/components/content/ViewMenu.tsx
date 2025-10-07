@@ -71,10 +71,10 @@ function ToggleOption(props: { label: string; checked: boolean; onToggle: () => 
     return (
         <button
             onClick={props.onToggle}
-            class="flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
+            class="flex w-full justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
         >
             <span>{props.label}</span>
-            <span class="text-gray-500 text-xs">{props.checked ? "✓" : ""}</span>
+            <span class="text-gray-500 text-xs ml-auto">{props.checked ? "✓" : ""}</span>
         </button>
     );
 }

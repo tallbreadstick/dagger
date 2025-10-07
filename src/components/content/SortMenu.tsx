@@ -53,10 +53,10 @@ export default function SortMenu(props: { onClose: () => void; x: number; y: num
             <div class="border-t border-gray-200 mt-1 pt-1">
                 <button
                     onClick={() => setAscending((prev) => !prev)}
-                    class="flex justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
+                    class="flex w-full justify-between items-center px-3 py-1.5 text-sm hover:bg-gray-100"
                 >
                     <span>Order</span>
-                    <span class="text-gray-500 text-xs">
+                    <span class="text-gray-500 text-xs text-nowrap ml-auto">
                         {ascending() ? "Ascending ↑" : "Descending ↓"}
                     </span>
                 </button>
