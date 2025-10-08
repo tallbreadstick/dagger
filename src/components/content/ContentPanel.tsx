@@ -13,7 +13,8 @@ import {
     FaSolidBoxArchive,
     FaSolidFileCode,
     FaSolidFilePowerpoint,
-    FaSolidFolder
+    FaSolidFolder,
+    FaSolidPlay
 } from "solid-icons/fa";
 import Tab from "../../classes/Tab";
 import { LazyImage } from "../LazyImage";
@@ -27,7 +28,7 @@ export default function ContentPanel(props: {
     showHidden: Accessor<boolean>;
     showExtensions: Accessor<boolean>;
 }) {
-    const [fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
+    const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal<string | null>(null);
@@ -137,13 +138,27 @@ export default function ContentPanel(props: {
         const execExts = ["exe", "msi", "jar", "bat", "sh", "app", "bin", "command", "run", "py", "pl", "rb"];
         const codeExts = ["js", "ts", "html", "htm", "css", "scss", "sass", "json", "xml", "yml", "yaml", "toml"];
 
-        if ((imageExts.includes(ext) || videoExts.includes(ext)) && file.thumbnail) {
+        const isVideo = videoExts.includes(ext);
+        const isImage = imageExts.includes(ext);
+
+        if ((isImage || isVideo) && file.thumbnail) {
             return (
-                <LazyImage
-                    src={`data:image;base64,${file.thumbnail}`}
-                    alt={name}
-                    class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded mb-1`}
-                />
+                <div class="relative inline-block mb-1">
+                    <LazyImage
+                        src={`data:image;base64,${file.thumbnail}`}
+                        alt={name}
+                        class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded`}
+                    />
+                    {isVideo && (
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <FaSolidPlay
+                                class={`text-white opacity-80 ${
+                                    props.viewMode() === 'grid' ? 'w-6 h-6' : 'w-3 h-3'
+                                }`}
+                            />
+                        </div>
+                    )}
+                </div>
             );
         }
 

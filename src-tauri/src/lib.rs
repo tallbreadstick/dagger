@@ -20,7 +20,6 @@ use crate::{
         },
         stream::{
             stream_directory_contents,
-            // cancel_current_stream,
             StreamState
         }
     }, search::modals::{
@@ -28,7 +27,12 @@ use crate::{
         upload_document_file,
         upload_image_file
     },
-    util::cmd::resolve_path_command
+    util::{
+        ffutils::{
+            ffmpeg_init
+        },
+        cmd::resolve_path_command
+    }
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,7 +58,6 @@ pub fn run() {
             resolve_user,
             // stream
             stream_directory_contents,
-            // cancel_current_stream,
             // util
             resolve_path_command
         ])
