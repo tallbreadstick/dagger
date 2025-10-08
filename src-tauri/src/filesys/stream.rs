@@ -35,24 +35,25 @@ pub async fn stream_directory_contents(
     path: String,
     sort_key: String,
     ascending: bool,
+    show_hidden: bool,
     request_id: u64,
 ) -> Result<(), String> {
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
     let encoder = GeneralPurpose::new(&base64::alphabet::STANDARD, base64::engine::general_purpose::PAD);
-
     let pool_ref = pool.inner().clone();
+
     let walker = WalkDir::new(&path)
         .max_depth(1)
         .follow_links(false)
-        .skip_hidden(false)
+        .skip_hidden(!show_hidden)
         .parallelism(jwalk::Parallelism::RayonExistingPool {
             pool: pool_ref,
             busy_timeout: Some(Duration::from_millis(20)),
         });
 
-    // Collect basic file metadata
+    // Phase 1: Collect metadata only
     let mut items: Vec<_> = walker
         .into_iter()
         .filter_map(|entry| entry.ok())
@@ -93,14 +94,39 @@ pub async fn stream_directory_contents(
         if ascending { ord } else { ord.reverse() }
     });
 
-    // Generate/fetch thumbnails in parallel, open DB inside each task
-    let results: Vec<_> = items
-        .into_par_iter()
-        .filter_map(|(name, path_str, is_dir, size, filetype, modified)| {
+    // Phase 1 emit: metadata only
+    for (name, path_str, is_dir, size, filetype, modified) in &items {
+        if state.cancelled.load(Ordering::Relaxed)
+            || state.current_id.load(Ordering::Relaxed) != request_id
+        {
+            return Ok(());
+        }
+
+        let _ = handle.emit("file-metadata", serde_json::json!({
+            "request_id": request_id,
+            "name": name,
+            "path": path_str,
+            "is_dir": is_dir,
+            "size": size,
+            "filetype": filetype,
+            "date_modified": modified
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs()),
+        }));
+    }
+
+    let _ = handle.emit("file-metadata-complete", serde_json::json!({
+        "request_id": request_id,
+        "path": path
+    }));
+
+    // Phase 2: generate/fetch thumbnails in parallel
+    items.into_par_iter()
+        .for_each(|(_name, path_str, is_dir, _size, _filetype, modified)| {
             if state.cancelled.load(Ordering::Relaxed)
                 || state.current_id.load(Ordering::Relaxed) != request_id
             {
-                return None;
+                return;
             }
 
             let ext = Path::new(&path_str)
@@ -108,73 +134,54 @@ pub async fn stream_directory_contents(
                 .map(|s| s.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
 
-            let thumbnail = if !is_dir && ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str()) {
-                // Open a new SQLite connection per thread/task
-                let conn = match open_thumb_db(&handle) {
-                    Ok(c) => c,
-                    Err(_) => return None,
-                };
+            if is_dir || !["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str()) {
+                return;
+            }
 
-                let hash = hash_path(&path_str);
-                let mtime = modified
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs() as i64)
-                    .unwrap_or(0);
+            let conn = match open_thumb_db(&handle) {
+                Ok(c) => c,
+                Err(_) => return,
+            };
 
-                if let Ok(Some((thumb_bytes, _, _))) = get_thumb(&conn, hash, mtime) {
-                    Some(encoder.encode(&thumb_bytes))
-                } else {
-                    match std::fs::read(&path_str) {
-                        Ok(bytes) => {
-                            if let Ok(reader) = ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
-                                if let Ok(img) = reader.decode() {
-                                    let thumb = img.resize(128, 128, image::imageops::FilterType::Nearest);
-                                    let mut buf = Vec::new();
-                                    if thumb.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg).is_ok() {
-                                        let _ = set_thumb(&conn, hash, mtime, Some(bytes.len() as i64), Some(&ext), &buf);
-                                        Some(encoder.encode(&buf))
-                                    } else { None }
+            let hash = hash_path(&path_str);
+            let mtime = modified
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+
+            let thumbnail = if let Ok(Some((thumb_bytes, _, _))) = get_thumb(&conn, hash, mtime) {
+                Some(encoder.encode(&thumb_bytes))
+            } else {
+                match std::fs::read(&path_str) {
+                    Ok(bytes) => {
+                        if let Ok(reader) = ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
+                            if let Ok(img) = reader.decode() {
+                                let thumb = img.resize(128, 128, image::imageops::FilterType::Nearest);
+                                let mut buf = Vec::new();
+                                if thumb.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg).is_ok() {
+                                    let _ = set_thumb(&conn, hash, mtime, Some(bytes.len() as i64), Some(&ext), &buf);
+                                    Some(encoder.encode(&buf))
                                 } else { None }
                             } else { None }
-                        }
-                        Err(_) => None,
+                        } else { None }
                     }
+                    Err(_) => None,
                 }
-            } else { None };
+            };
 
-            Some((name, path_str, is_dir, size, filetype, thumbnail, modified))
-        })
-        .collect();
+            let _ = handle.emit("file-thumbnail", serde_json::json!({
+                "request_id": request_id,
+                "path": path_str,
+                "thumbnail": thumbnail,
+            }));
+        });
 
-    // Emit results
-    for (name, path_str, is_dir, size, filetype, thumbnail, modified) in results {
-        if state.cancelled.load(Ordering::Relaxed)
-            || state.current_id.load(Ordering::Relaxed) != request_id
-        {
-            println!("Cancelled before emit for {}", path);
-            return Ok(());
-        }
-
-        let _ = handle.emit("file-chunk", serde_json::json!({
-            "request_id": request_id,
-            "name": name,
-            "path": path_str,
-            "is_dir": is_dir,
-            "size": size,
-            "filetype": filetype,
-            "thumbnail": thumbnail,
-            "date_modified": modified
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_secs()),
-        }));
-    }
-
-    // Emit completion
+    // Phase 3: complete
     if !state.cancelled.load(Ordering::Relaxed)
         && state.current_id.load(Ordering::Relaxed) == request_id
     {
         let _ = handle.emit(
-            "file-chunk-complete",
+            "file-stream-complete",
             serde_json::json!({ "request_id": request_id, "path": path }),
         );
     }

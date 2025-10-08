@@ -27,6 +27,7 @@ export default function ContentPanel(props: {
     showHidden: Accessor<boolean>;
     showExtensions: Accessor<boolean>;
 }) {
+    const [fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
     const [error, setError] = createSignal<string | null>(null);
@@ -38,13 +39,13 @@ export default function ContentPanel(props: {
     let cancelStream: (() => Promise<void>) | null = null;
 
     const loadDirectory = async (path: string) => {
+        setFileMap(new Map());
         setFiles([]);
         setLoading(true);
         setProgress(0);
         setShowProgress(true);
         startTime = performance.now();
 
-        // Kill previous simulated progress timer
         if (progressTimer) cancelAnimationFrame(progressTimer);
 
         if (cancelStream) {
@@ -52,46 +53,51 @@ export default function ContentPanel(props: {
             cancelStream = null;
         }
 
-        const pendingChunks: FileChunk[] = [];
-        let rafScheduled = false;
-
-        function scheduleUpdate() {
-            if (!rafScheduled) {
-                rafScheduled = true;
-                requestAnimationFrame(() => {
-                    setFiles(prev => [...prev, ...pendingChunks.splice(0)]);
-                    rafScheduled = false;
-                });
-            }
-        }
-
-        // 🕒 Fake smooth progress that slows over time
+        // 🕒 Fake smooth progress
         function simulateProgress() {
             if (!startTime) return;
-            const elapsed = (performance.now() - startTime) / 1000; // seconds
-            // Easing: fast start, slow finish
+            const elapsed = (performance.now() - startTime) / 1000;
             const eased = 1 - Math.exp(-0.6 * elapsed);
-            setProgress(Math.min(eased * 0.98, 0.98)); // cap at 98% until real done
+            setProgress(Math.min(eased * 0.98, 0.98));
             progressTimer = requestAnimationFrame(simulateProgress);
         }
         progressTimer = requestAnimationFrame(simulateProgress);
 
         const unlisten = await streamDirectoryContents(
             path,
+            // Phase 1: metadata
             (chunk: FileChunk) => {
                 if (!props.showHidden && chunk.name.startsWith('.')) return;
-                pendingChunks.push(chunk);
-                scheduleUpdate();
+                setFileMap(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(chunk.path, chunk);
+                    setFiles(Array.from(newMap.values()));
+                    return newMap;
+                });
             },
             () => {
-                // ✅ Real completion
+                setLoading(false);
+            },
+            // Phase 2: thumbnails
+            (filePath: string, thumbnail: string | null) => {
+                setFileMap(prev => {
+                    const newMap = new Map(prev);
+                    const existing = newMap.get(filePath);
+                    if (existing) {
+                        newMap.set(filePath, { ...existing, thumbnail });
+                        setFiles(Array.from(newMap.values()));
+                    }
+                    return newMap;
+                });
+            },
+            // Phase 3: complete
+            () => {
                 if (progressTimer) cancelAnimationFrame(progressTimer);
                 setProgress(1);
-                setLoading(false);
                 setTimeout(() => setShowProgress(false), 400);
                 cancelStream = null;
             },
-            { sortKey: props.sortKey(), ascending: props.ascending() }
+            { sortKey: props.sortKey(), ascending: props.ascending(), showHidden: props.showHidden() }
         );
 
         cancelStream = async () => {
@@ -121,7 +127,6 @@ export default function ContentPanel(props: {
         }
 
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
-
         const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md", "pages", "tex", "log"];
         const presExts = ["ppt", "pptx", "odp", "key", "gslides"];
         const sheetExts = ["xls", "xlsx", "csv", "ods", "numbers"];
@@ -160,7 +165,7 @@ export default function ContentPanel(props: {
         const d = new Date(dateStr);
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ` +
             `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    }
+    };
 
     function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
         if (!entry) return;
@@ -171,7 +176,6 @@ export default function ContentPanel(props: {
     function handleNavigate(path: string) {
         const entry = props.currentTab;
         if (!entry) return;
-
         updateTab(entry, (tab) => {
             const newTab = tab.clone();
             newTab.navigateTo(path);
@@ -181,13 +185,8 @@ export default function ContentPanel(props: {
 
     const handleDoubleClick = (file: FileChunk) => {
         if (!props.currentTab) return;
-        if (file.is_dir) {
-            handleNavigate(file.path);
-        } else {
-            openPath(file.path).catch((err) => {
-                setError(err);
-            });
-        }
+        if (file.is_dir) handleNavigate(file.path);
+        else openPath(file.path).catch((err) => setError(err));
     };
 
     return (
@@ -196,59 +195,42 @@ export default function ContentPanel(props: {
                 <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
                     <div
                         class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 to-blue-300 shadow-[0_0_10px_rgba(96,165,250,0.7)] transition-all duration-300 ease-out"
-                        style={{
-                            width: `${progress() * 100}%`,
-                            opacity: progress() >= 1 ? 0 : 1,
-                        }}
+                        style={{ width: `${progress() * 100}%`, opacity: progress() >= 1 ? 0 : 1 }}
                     />
                 </div>
             </Show>
-            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
 
+            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
                 <Show when={!loading()}>
                     <div
-                        class={`${props.viewMode() === 'grid'
-                            ? 'grid gap-3 justify-items-center'
-                            : 'flex flex-col gap-1'}`}
-                        style={props.viewMode() === 'grid'
-                            ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));'
-                            : undefined}
+                        class={`${props.viewMode() === 'grid' ? 'grid gap-3 justify-items-center' : 'flex flex-col gap-1'}`}
+                        style={props.viewMode() === 'grid' ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));' : undefined}
                     >
-                        <For each={files()}>
-                            {(file) => (
-                                <div
-                                    onDblClick={() => handleDoubleClick(file)}
-                                    class={`flex ${props.viewMode() === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
-                                    title={file.name}
-                                >
-                                    {getFileIcon(file)}
-
-                                    {props.viewMode() === 'grid' ? (
-                                        <div class="text-center mt-1 w-full">
-                                            <div class="truncate text-xs">{file.name}</div>
+                        <For each={files()}>{(file) => (
+                            <div
+                                onDblClick={() => handleDoubleClick(file)}
+                                class={`flex ${props.viewMode() === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                title={file.name}
+                            >
+                                {getFileIcon(file)}
+                                {props.viewMode() === 'grid' ? (
+                                    <div class="text-center mt-1 w-full">
+                                        <div class="truncate text-xs">{file.name}</div>
+                                    </div>
+                                ) : (
+                                    <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
+                                        <div class="flex-1 truncate">{file.name}</div>
+                                        <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
+                                        <div class="w-24 text-right ml-6">
+                                            {!file.is_dir && file.size != null
+                                                ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
+                                                : '-'}
                                         </div>
-                                    ) : (
-                                        <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
-                                            {/* Name column */}
-                                            <div class="flex-1 truncate">{file.name}</div>
-
-                                            {/* Type column */}
-                                            <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
-
-                                            {/* Size column */}
-                                            <div class="w-24 text-right ml-6">
-                                                {!file.is_dir && file.size != null
-                                                    ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
-                                                    : '-'}
-                                            </div>
-
-                                            {/* Date modified column */}
-                                            <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </For>
+                                        <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}</For>
                     </div>
                 </Show>
 
