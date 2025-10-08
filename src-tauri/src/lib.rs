@@ -12,34 +12,24 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{
-            get_tree_from_root,
-            list_directory_contents,
-            register_recent_access,
-            resolve_user
-        },
-        stream::{
-            stream_directory_contents,
-            StreamState
-        }
-    }, search::modals::{
-        upload_audio_file,
-        upload_document_file,
-        upload_image_file
+        nav::{get_tree_from_root, list_directory_contents, register_recent_access, resolve_user},
+        stream::{stream_directory_contents, StreamState},
     },
-    util::cmd::resolve_path_command
+    search::modals::{upload_audio_file, upload_document_file, upload_image_file},
+    util::{
+        caches::{HomeCache, SharedHomeCache},
+        cmd::resolve_path_command,
+    },
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .manage(SharedHomeCache::new(HomeCache::default()))
         .manage(Arc::new(StreamState::default()))
         .manage(Arc::new(
-            ThreadPoolBuilder::new()
-                .num_threads(8)
-                .build()
-                .unwrap()
+            ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
         ))
         .invoke_handler(tauri::generate_handler![
             // modals
@@ -66,24 +56,22 @@ pub fn run() {
             // Clone window handle for use inside closure
             let win_clone = window.clone();
 
-            window.on_window_event(move |event| {
-                match event {
-                    tauri::WindowEvent::Focused(true) => {
-                        #[cfg(target_os = "windows")]
-                        {
-                            let _ = win_clone.emit("window-focus", ());
-                            apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
-                        }
+            window.on_window_event(move |event| match event {
+                tauri::WindowEvent::Focused(true) => {
+                    #[cfg(target_os = "windows")]
+                    {
+                        let _ = win_clone.emit("window-focus", ());
+                        apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
                     }
-                    tauri::WindowEvent::Focused(false) => {
-                        #[cfg(target_os = "windows")]
-                        {
-                            let _ = win_clone.emit("window-blur", ());
-                            clear_acrylic(&win_clone).ok();
-                        }
-                    }
-                    _ => {}
                 }
+                tauri::WindowEvent::Focused(false) => {
+                    #[cfg(target_os = "windows")]
+                    {
+                        let _ = win_clone.emit("window-blur", ());
+                        clear_acrylic(&win_clone).ok();
+                    }
+                }
+                _ => {}
             });
 
             Ok(())

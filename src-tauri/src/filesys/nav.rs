@@ -3,10 +3,10 @@ use std::path::Path;
 use serde::{Serialize, Deserialize};
 use tauri::{AppHandle, Manager};
 
-use crate::util::caches::{load_home_cache, save_home_cache};
+use crate::util::caches::{load_home_cache, save_home_cache, SharedHomeCache};
 
 /// Represents a single file or directory entry.
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FileItem {
     pub name: String,
     pub path: String,
@@ -34,42 +34,42 @@ pub struct FileNode {
 }
 
 /// Adds an entry to the "recent" list when a file/folder is accessed.
-/// Automatically de-duplicates and caps the length to 20 entries.
+/// Automatically de-duplicates and caps the length (50 files / 12 dirs).
 #[tauri::command]
-pub fn register_recent_access(handle: AppHandle, path: &str) -> Result<(), String> {
-    let metadata = fs::metadata(path)
+pub async fn register_recent_access(
+    handle: AppHandle,
+    state: tauri::State<'_, SharedHomeCache>,
+    path: String,
+) -> Result<(), String> {
+    let shared_cache = state.inner();
+    // Fetch metadata
+    let metadata = fs::metadata(&path)
         .map_err(|e| format!("Failed to access metadata for {}: {}", path, e))?;
     let is_dir = metadata.is_dir();
     let size = if !is_dir { Some(metadata.len()) } else { None };
-    let name = Path::new(path)
+    let name = Path::new(&path)
         .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
 
-    let mut cache = load_home_cache(&handle);
-
     let item = FileItem {
         name,
-        path: path.to_string(),
+        path: path.clone(),
         is_dir,
         size,
     };
 
-    let target_list = if is_dir { &mut cache.recent_dirs } else { &mut cache.recent_files };
-
-    // Remove duplicates
-    target_list.retain(|f| f.path != path);
-
-    // Insert at the top
-    target_list.insert(0, item);
-
-    // Cap list size
-    if target_list.len() > 20 {
-        target_list.truncate(20);
+    // Push into appropriate recent list using the async home cache
+    if is_dir {
+        shared_cache.push_recent_dir(item).await;
+    } else {
+        shared_cache.push_recent_file(item).await;
     }
 
-    save_home_cache(&handle, &cache);
+    // Persist to disk
+    shared_cache.save(&handle).await;
+
     Ok(())
 }
 

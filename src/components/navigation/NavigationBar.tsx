@@ -27,6 +27,8 @@ export default function NavigationBar(props: {
     searchBarMode: string;
     setSearchBarMode: (val: "text" | "image" | "audio" | "document") => void;
     registerFocusHandler?: (handler: () => void) => void;
+    refresh?: Accessor<number>;
+    setRefresh?: Setter<number>;
 }) {
     let searchInputRef: HTMLInputElement | undefined;
 
@@ -85,9 +87,7 @@ export default function NavigationBar(props: {
     };
 
     const refresh = () => {
-        const entry = props.currentTabEntry();
-        if (!entry) return;
-        entry.setTab((prev) => prev as any); // just re-trigger
+        props.setRefresh?.(props.refresh ? props.refresh() + 1 : 1);
     };
 
     // Make currentTab reactive by calling it as a function

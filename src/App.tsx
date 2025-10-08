@@ -111,6 +111,8 @@ export default function App() {
         setCurrentTab(newEntry);
     }
 
+    const [refresh, setRefresh] = createSignal(0); // dummy signal to force re-renders
+
     // 🔹 Search state
     const [searchMode, setSearchMode] = createSignal(false);
     const [searchBarMode, setSearchBarMode] = createSignal<
@@ -164,6 +166,8 @@ export default function App() {
                     searchBarMode={searchBarMode()}
                     setSearchBarMode={setSearchBarMode}
                     registerFocusHandler={(fn) => (focusSearchInput = fn)}
+                    refresh={refresh}
+                    setRefresh={setRefresh}
                 />
 
                 <div class="flex flex-row flex-1 min-h-0 overflow-hidden select-none">
@@ -186,15 +190,6 @@ export default function App() {
                                 width={sidebarWidth()}
                                 setWidth={setSidebarWidth}
                             />
-                            {/* Resizer handle — inside same flex group for consistent layout */}
-                            {/* <div
-                                onMouseDown={startResize}
-                                class="w-1 cursor-col-resize bg-transparent hover:bg-white/20 active:bg-white/40 transition-colors duration-150"
-                                style={{
-                                    "user-select": "none",
-                                    "touch-action": "none",
-                                }}
-                            /> */}
                         </div>
 
                         {/* Main content area */}
@@ -222,6 +217,8 @@ export default function App() {
                                     viewMode={viewMode}
                                     showHidden={showHidden}
                                     showExtensions={showExtensions}
+                                    refresh={refresh}
+                                    setRefresh={setRefresh}
                                 />
                             </div>
                         </div>

@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, For, Show, Accessor } from "solid-js";
+import { createSignal, createEffect, onCleanup, For, Show, Accessor, Setter } from "solid-js";
 import { Portal } from "solid-js/web";
 import type { TabEntry } from "../../App";
 import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
@@ -27,6 +27,8 @@ export default function ContentPanel(props: {
     viewMode: Accessor<'grid' | 'list'>;
     showHidden: Accessor<boolean>;
     showExtensions: Accessor<boolean>;
+    refresh?: Accessor<number>;
+    setRefresh?: Setter<number>;
 }) {
     const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
@@ -112,6 +114,7 @@ export default function ContentPanel(props: {
         props.sortKey();
         props.ascending();
         props.showHidden();
+        props.refresh?.();
         if (path) await loadDirectory(path);
         else setFiles([]);
     });
