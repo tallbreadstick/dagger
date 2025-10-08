@@ -11,6 +11,7 @@ use image::ImageReader;
 use jwalk::WalkDir;
 use rayon::prelude::*;
 use tauri::{AppHandle, Emitter, State};
+use crate::util::caches::{open_thumb_db, get_thumb, set_thumb, hash_path};
 
 pub struct StreamState {
     pub current_id: AtomicU64,
@@ -36,31 +37,27 @@ pub async fn stream_directory_contents(
     ascending: bool,
     request_id: u64,
 ) -> Result<(), String> {
-    // mark new stream as active
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
-    // base64 encoder for thumbnails
-    let encoder = GeneralPurpose::new(&base64::alphabet::STANDARD, base64::engine::general_purpose::PAD); 
+    let encoder = GeneralPurpose::new(&base64::alphabet::STANDARD, base64::engine::general_purpose::PAD);
 
-    // walker pool — lightweight tasks
     let pool_ref = pool.inner().clone();
     let walker = WalkDir::new(&path)
-        .max_depth(1) // only the top-level directory
+        .max_depth(1)
         .follow_links(false)
         .skip_hidden(false)
         .parallelism(jwalk::Parallelism::RayonExistingPool {
             pool: pool_ref,
-            busy_timeout: Some(Duration::from_millis(20))
+            busy_timeout: Some(Duration::from_millis(20)),
         });
 
-    // collect basic file data in parallel
+    // Collect basic file metadata
     let mut items: Vec<_> = walker
         .into_iter()
         .filter_map(|entry| entry.ok())
         .filter(|entry| entry.path() != Path::new(&path))
         .filter_map(|entry| {
-            // check cancel before doing any metadata
             if state.cancelled.load(Ordering::Relaxed)
                 || state.current_id.load(Ordering::Relaxed) != request_id
             {
@@ -83,11 +80,9 @@ pub async fn stream_directory_contents(
         })
         .collect();
 
-    // sort results
+    // Sort files
     items.sort_by(|a, b| {
-        if a.2 != b.2 {
-            return b.2.cmp(&a.2);
-        }
+        if a.2 != b.2 { return b.2.cmp(&a.2); }
         let ord = match sort_key.as_str() {
             "name" => a.0.to_lowercase().cmp(&b.0.to_lowercase()),
             "size" => a.3.cmp(&b.3),
@@ -98,9 +93,9 @@ pub async fn stream_directory_contents(
         if ascending { ord } else { ord.reverse() }
     });
 
-    // thumbnail generation pool — heavy tasks
+    // Generate/fetch thumbnails in parallel, open DB inside each task
     let results: Vec<_> = items
-        .into_par_iter() // rayon parallel loop
+        .into_par_iter()
         .filter_map(|(name, path_str, is_dir, size, filetype, modified)| {
             if state.cancelled.load(Ordering::Relaxed)
                 || state.current_id.load(Ordering::Relaxed) != request_id
@@ -113,61 +108,45 @@ pub async fn stream_directory_contents(
                 .map(|s| s.to_string_lossy().to_lowercase())
                 .unwrap_or_default();
 
-            let thumbnail = if !is_dir
-                && ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str())
-            {
-                // lightweight cancellation re-check
-                if state.cancelled.load(Ordering::Relaxed)
-                    || state.current_id.load(Ordering::Relaxed) != request_id
-                {
-                    None
+            let thumbnail = if !is_dir && ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str()) {
+                // Open a new SQLite connection per thread/task
+                let conn = match open_thumb_db(&handle) {
+                    Ok(c) => c,
+                    Err(_) => return None,
+                };
+
+                let hash = hash_path(&path_str);
+                let mtime = modified
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+
+                if let Ok(Some((thumb_bytes, _, _))) = get_thumb(&conn, hash, mtime) {
+                    Some(encoder.encode(&thumb_bytes))
                 } else {
                     match std::fs::read(&path_str) {
                         Ok(bytes) => {
-                            if let Ok(reader) =
-                                ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format()
-                            {
+                            if let Ok(reader) = ImageReader::new(std::io::Cursor::new(&bytes)).with_guessed_format() {
                                 if let Ok(img) = reader.decode() {
                                     let thumb = img.resize(128, 128, image::imageops::FilterType::Nearest);
                                     let mut buf = Vec::new();
-                                    if thumb
-                                        .write_to(
-                                            &mut std::io::Cursor::new(&mut buf),
-                                            image::ImageFormat::Jpeg,
-                                        )
-                                        .is_ok()
-                                    {
+                                    if thumb.write_to(&mut std::io::Cursor::new(&mut buf), image::ImageFormat::Jpeg).is_ok() {
+                                        let _ = set_thumb(&conn, hash, mtime, Some(bytes.len() as i64), Some(&ext), &buf);
                                         Some(encoder.encode(&buf))
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
-                            } else {
-                                None
-                            }
+                                    } else { None }
+                                } else { None }
+                            } else { None }
                         }
                         Err(_) => None,
                     }
                 }
-            } else {
-                None
-            };
+            } else { None };
 
-            Some((
-                name,
-                path_str,
-                is_dir,
-                size,
-                filetype,
-                thumbnail,
-                modified,
-            ))
+            Some((name, path_str, is_dir, size, filetype, thumbnail, modified))
         })
         .collect();
 
-    // emit results back in order
+    // Emit results
     for (name, path_str, is_dir, size, filetype, thumbnail, modified) in results {
         if state.cancelled.load(Ordering::Relaxed)
             || state.current_id.load(Ordering::Relaxed) != request_id
@@ -190,7 +169,7 @@ pub async fn stream_directory_contents(
         }));
     }
 
-    // final completion
+    // Emit completion
     if !state.cancelled.load(Ordering::Relaxed)
         && state.current_id.load(Ordering::Relaxed) == request_id
     {

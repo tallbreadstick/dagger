@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use rayon::ThreadPoolBuilder;
 #[cfg(target_os = "windows")]
 use tauri::Emitter;
 use tauri::Manager;
@@ -36,10 +37,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(StreamState::default()))
         .manage(Arc::new(
-            rayon::ThreadPoolBuilder::new()
+            ThreadPoolBuilder::new()
                 .num_threads(8)
                 .build()
-                .unwrap(),
+                .unwrap()
         ))
         .invoke_handler(tauri::generate_handler![
             // modals

@@ -1,8 +1,9 @@
 use std::fs;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use serde::{Serialize, Deserialize};
 use tauri::{AppHandle, Manager};
+
+use crate::util::caches::{load_home_cache, save_home_cache};
 
 /// Represents a single file or directory entry.
 #[derive(Serialize, Deserialize, Clone)]
@@ -30,52 +31,6 @@ pub struct FileNode {
     pub path: String,
     pub is_dir: bool,
     pub children: Option<Vec<FileNode>>,
-}
-
-/// Represents the user's cached "Home" view.
-#[derive(Serialize, Deserialize, Default)]
-pub struct HomeCache {
-    pub recent_files: Vec<FileItem>,
-    pub recent_dirs: Vec<FileItem>,
-}
-
-/// Location of the app cache directory in AppData.
-fn get_cache_dir(handle: &AppHandle) -> PathBuf {
-    let mut dir = handle.path()
-        .app_data_dir()
-        .unwrap();
-    dir.push("Dagger");
-    fs::create_dir_all(&dir).ok();
-    dir
-}
-
-/// Location of the home cache JSON file.
-fn get_home_cache_path(handle: &AppHandle) -> PathBuf {
-    let mut path = get_cache_dir(handle);
-    path.push("recent.json");
-    path
-}
-
-/// Loads the cached recent items from disk, or creates an empty cache if missing.
-fn load_home_cache(handle: &AppHandle) -> HomeCache {
-    let path = get_home_cache_path(handle);
-    if let Ok(mut file) = fs::File::open(&path) {
-        let mut data = String::new();
-        if file.read_to_string(&mut data).is_ok() {
-            if let Ok(cache) = serde_json::from_str::<HomeCache>(&data) {
-                return cache;
-            }
-        }
-    }
-    HomeCache::default()
-}
-
-/// Saves the home cache back to disk.
-fn save_home_cache(handle: &AppHandle, cache: &HomeCache) {
-    let path = get_home_cache_path(handle);
-    if let Ok(mut file) = fs::File::create(&path) {
-        let _ = file.write_all(serde_json::to_string_pretty(cache).unwrap().as_bytes());
-    }
 }
 
 /// Adds an entry to the "recent" list when a file/folder is accessed.

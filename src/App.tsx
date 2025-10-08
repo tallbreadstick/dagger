@@ -37,12 +37,6 @@ export default function App() {
     let sidebarRef: HTMLDivElement | undefined;
     let isResizing = false;
 
-    function startResize(e: MouseEvent) {
-        isResizing = true;
-        e.preventDefault();
-        document.body.style.cursor = "col-resize";
-    }
-
     function stopResize() {
         if (isResizing) {
             isResizing = false;
