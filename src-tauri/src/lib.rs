@@ -27,12 +27,7 @@ use crate::{
         upload_document_file,
         upload_image_file
     },
-    util::{
-        ffutils::{
-            ffmpeg_init
-        },
-        cmd::resolve_path_command
-    }
+    util::cmd::resolve_path_command
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

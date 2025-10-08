@@ -175,9 +175,9 @@ export default function ContentPanel(props: {
         return <FaSolidFile class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
     }
 
-    const formatDate = (dateStr?: string) => {
-        if (!dateStr) return "";
-        const d = new Date(dateStr);
+    const formatDate = (timestampSec?: number) => {
+        if (timestampSec == null) return "";
+        const d = new Date(timestampSec * 1000); // <-- multiply by 1000
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ` +
             `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     };

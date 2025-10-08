@@ -9,7 +9,7 @@ export type FileChunk = {
     size?: number;
     filetype?: string;
     thumbnail?: string | null;
-    date_modified?: string | undefined;
+    date_modified?: number | undefined;
 };
 
 export type StreamOptions = {

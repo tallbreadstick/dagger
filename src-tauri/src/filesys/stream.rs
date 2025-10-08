@@ -142,10 +142,18 @@ pub async fn stream_directory_contents(
         };
 
         let hash = hash_path(&path_str);
-        let mtime = modified
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
+        let mtime = match modified {
+            Some(t) => t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_else(|e| { 
+                            println!("Error computing duration: {:?}", e);
+                            Duration::ZERO
+                        })
+                        .as_secs() as i64,
+            None => {
+                println!("File {} has no modified time!", path_str);
+                0
+            }
+        };
 
         let thumbnail = if let Ok(Some((thumb_bytes, _, _))) = get_thumb(&conn, hash, mtime) {
             Some(encoder.encode(&thumb_bytes))

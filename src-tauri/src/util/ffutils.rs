@@ -72,14 +72,5 @@ pub fn ffmpeg_init(handle: &AppHandle) -> FFmpegHandler {
         .resource_dir()
         .unwrap_or_else(|_| panic!("Failed to get Tauri resource directory"));
     let handler = FFmpegHandler::new(&resource_dir);
-
-    // Optionally log FFmpeg help at startup
-    let help = Command::new(&handler.ffmpeg_path)
-        .arg("-h")
-        .output()
-        .unwrap_or_else(|e| panic!("Failed to execute FFmpeg: {}", e));
-
-    println!("{}", String::from_utf8_lossy(&help.stdout));
-
     handler
 }
