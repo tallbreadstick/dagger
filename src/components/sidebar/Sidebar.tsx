@@ -19,6 +19,7 @@ export default function Sidebar(props: {
     setWidth: (w: number) => void;
 }) {
     const [rootNode, setRootNode] = createSignal<FileNode | null>(null);
+    const [treeWorkingDir, setTreeWorkingDir] = createSignal<string>("");
     const [quickAccess, setQuickAccess] = createSignal<
         { name: string; path: string; icon: any }[]
     >([]);
@@ -46,7 +47,10 @@ export default function Sidebar(props: {
         if (current) {
             const path = current.tab.workingDir;
             getDirectoryTreeFromRoot(path)
-                .then((tree) => setRootNode(tree as FileNode))
+                .then((tree) => {
+                    setRootNode(tree as FileNode);
+                    setTreeWorkingDir(path); // Update working dir only after tree is ready
+                })
                 .catch((err) => console.error("Failed to load directory tree:", err));
         }
     });
@@ -67,8 +71,6 @@ export default function Sidebar(props: {
             return newTab;
         });
     }
-
-    const workingDir = () => props.currentTab?.()?.tab.workingDir ?? "";
 
     // 🎚️ Sidebar resize handling
     let sidebarRef: HTMLDivElement | undefined;
@@ -109,7 +111,7 @@ export default function Sidebar(props: {
                         node={rootNode()!}
                         depth={0}
                         onNavigate={handleNavigate}
-                        workingDir={workingDir()}
+                        workingDir={treeWorkingDir()}
                     />
                 </Show>
             </div>

@@ -1,5 +1,6 @@
-use std::fs;
-use std::path::Path;
+use std::{fs, path::Component};
+use std::path::{Path, PathBuf};
+use jwalk::WalkDir;
 use serde::{Serialize, Deserialize};
 use tauri::{AppHandle, Manager};
 
@@ -124,63 +125,96 @@ pub async fn register_recent_access(
 //     }
 // }
 
-/// Recursively builds tree along a path from root to target
 #[tauri::command]
 pub fn get_tree_from_root(target_path: &str) -> Result<FileNode, String> {
-    use std::path::{Path, PathBuf, Component};
-    use std::fs;
+    // --- Normalize and canonicalize base path ---
+    let mut normalized = target_path.to_string();
 
-    // Determine the system root
-    let root_path = if cfg!(windows) {
-        PathBuf::from("C:\\")
-    } else {
-        PathBuf::from("/") // linux, mac, etc
+    if normalized.is_empty() {
+        normalized = if cfg!(windows) { "C:\\".into() } else { "/".into() };
+    } else if cfg!(windows) {
+        if normalized.ends_with(':') {
+            normalized.push('\\');
+        }
+        normalized = normalized.replace('/', "\\");
+    }
+
+    // Canonicalize with dunce (removes \\?\ and resolves symlinks)
+    let target = dunce::canonicalize(&normalized).unwrap_or_else(|_| PathBuf::from(&normalized));
+
+    // --- Determine drive root (C:\, D:\, etc.) ---
+    #[cfg(windows)]
+    let root_path: PathBuf = {
+        if let Some(Component::Prefix(prefix)) = target.components().next() {
+            let drive = prefix.as_os_str().to_string_lossy();
+            PathBuf::from(format!("{}\\", drive.trim_end_matches('\\')))
+        } else {
+            PathBuf::from("C:\\")
+        }
     };
 
-    // Compute remaining components from root to target
-    let target = Path::new(target_path);
-    let relative = target.strip_prefix(&root_path).unwrap_or(target);
+    #[cfg(not(windows))]
+    let root_path = PathBuf::from("/");
+
+    let root_path = dunce::canonicalize(&root_path).unwrap_or(root_path.clone());
+
+    // --- Compute relative path from root to target ---
+    let relative = target.strip_prefix(&root_path).unwrap_or(target.as_path());
     let components: Vec<_> = relative.components().collect();
 
-    // Recursive function: only expand the path along target_path
+    // --- Helper to clean \\?\ prefixes ---
+    fn normalize_path(p: &Path) -> String {
+        let s = p.to_string_lossy();
+        s.strip_prefix(r"\\?\").unwrap_or(&s).to_string()
+    }
+
+    // --- Recursive tree builder ---
     fn build_tree_along_path(path: PathBuf, remaining: &[Component]) -> FileNode {
-        let path_str = path.to_string_lossy().to_string();
-        let name = path.file_name()
+        let path_str = normalize_path(&path);
+        let name = path
+            .file_name()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_else(|| path_str.clone());
 
-        let mut children: Vec<FileNode> = Vec::new();
+        let mut children = Vec::new();
 
-        // Read immediate children for lazy loading
-        if let Ok(entries) = fs::read_dir(&path) {
-            for entry in entries.flatten() {
-                let meta = entry.metadata().ok();
-                if let Some(meta) = meta {
-                    let is_dir = meta.is_dir();
-                    let child_path = entry.path();
-                    let child_name = entry.file_name().to_string_lossy().to_string();
-                    children.push(FileNode {
-                        name: child_name,
-                        path: child_path.to_string_lossy().to_string(),
-                        is_dir,
-                        children: if is_dir { Some(Vec::new()) } else { None }, // lazy
-                    });
-                }
+        for entry in WalkDir::new(&path)
+            .max_depth(1)
+            .skip_hidden(false)
+            .into_iter()
+            .flatten()
+        {
+            if entry.path() == path {
+                continue;
             }
 
-            // Sort dirs first
-            children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-                (true, false) => std::cmp::Ordering::Less,
-                (false, true) => std::cmp::Ordering::Greater,
-                _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+            let is_dir = entry.file_type().is_dir();
+            let child_path = entry.path();
+            let child_name = entry.file_name().to_string_lossy().to_string();
+
+            children.push(FileNode {
+                name: child_name,
+                path: normalize_path(&child_path),
+                is_dir,
+                children: if is_dir { Some(Vec::new()) } else { None },
             });
         }
 
-        // If there are remaining components, recurse into the next
-        if !remaining.is_empty() {
+        // Sort: directories first, then alphabetically
+        children.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        });
+
+        // Recurse along target subpath
+        if let Some((first, rest)) = remaining.split_first() {
+            let next_name = first.as_os_str().to_string_lossy();
             for child in &mut children {
-                if child.name == remaining[0].as_os_str().to_string_lossy() {
-                    *child = build_tree_along_path(PathBuf::from(&child.path), &remaining[1..]);
+                if child.name.eq_ignore_ascii_case(&next_name) {
+                    let mut next_path = path.clone();
+                    next_path.push(&child.name);
+                    *child = build_tree_along_path(next_path, rest);
                     break;
                 }
             }

@@ -40,9 +40,20 @@ pub async fn stream_directory_contents(
 ) -> Result<(), String> {
 
     if path.is_empty() {
-        path = if cfg!(windows) { "C:\\".to_string() } else { "/".to_string() };
-    } else if cfg!(windows) && path.ends_with(":") {
-        path.push('\\');
+        // Default to root depending on OS
+        path = if cfg!(windows) {
+            "C:\\".to_string()
+        } else {
+            "/".to_string()
+        };
+    } else if cfg!(windows) {
+        // Handle "C:" or "D:" without trailing slash
+        if path.ends_with(':') {
+            path.push('\\');
+        }
+
+        // Also normalize forward slashes to backslashes (in case frontend sent them)
+        path = path.replace('/', "\\");
     }
 
     state.current_id.store(request_id, Ordering::Relaxed);

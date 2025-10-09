@@ -28,20 +28,24 @@ export function TreeNode(props: {
     const [expanded, setExpanded] = createSignal(false);
     const [children, setChildren] = createSignal<FileNode[]>(props.node.children ?? []);
     const [loading, setLoading] = createSignal(false);
+    const [hasLoadedChildren, setHasLoadedChildren] = createSignal(false);
     let nodeRef: HTMLDivElement | undefined;
 
+    // Reset children when the node prop changes (e.g., new tree loaded)
+    createEffect(() => {
+        setChildren(props.node.children ?? []);
+        setHasLoadedChildren(false);
+    });
+
+    // Check if this node already has children from the initial tree
+    const hasInitialChildren = (props.node.children?.length ?? 0) > 0;
+
     // Auto-expand if part of working directory
-    createEffect(async () => {
+    createEffect(() => {
         const isWithinPath = props.workingDir.startsWith(props.node.path);
-        const isExactPath = props.workingDir === props.node.path;
 
         if (isWithinPath) {
             setExpanded(true);
-
-            // If this node *is* the working directory itself, load its children if not loaded yet
-            if (isExactPath && props.node.is_dir && children().length === 0 && !loading()) {
-                await loadChildren();
-            }
         } else {
             setExpanded(false);
         }
@@ -51,28 +55,27 @@ export function TreeNode(props: {
     // Wait a couple of animation frames so nested children have time to render
     // after expansion — avoids the "layout shifts after scroll" problem.
     createEffect(() => {
-    if (props.workingDir === props.node.path && nodeRef) {
-        // two RAFs are a reliable, lightweight way to wait for nested renders/paint
-        requestAnimationFrame(() => {
+        if (props.workingDir === props.node.path && nodeRef) {
+            // two RAFs are a reliable, lightweight way to wait for nested renders/paint
             requestAnimationFrame(() => {
-                nodeRef!.scrollIntoView({ behavior: "smooth", block: "start" });
+                requestAnimationFrame(() => {
+                    nodeRef!.scrollIntoView({ behavior: "smooth", block: "start" });
+                });
             });
-        });
-    }
+        }
     });
 
     // Expand and preload children on mount if needed
-    onMount(async () => {
+    onMount(() => {
         if (props.node.is_dir && props.workingDir.startsWith(props.node.path)) {
             setExpanded(true);
-            if (children().length === 0) {
-                await loadChildren();
-            }
         }
     });
 
     async function loadChildren() {
         if (!props.node.is_dir) return;
+        if (hasLoadedChildren()) return; // Don't reload if already loaded
+        
         setLoading(true);
         try {
             const items = await listDirectoryContents(props.node.path);
@@ -83,6 +86,7 @@ export function TreeNode(props: {
                 children: item.is_dir ? [] : undefined,
             }));
             setChildren(nodes);
+            setHasLoadedChildren(true);
         } catch (err) {
             console.error("Error loading children:", err);
             setChildren([]);
@@ -107,7 +111,8 @@ export function TreeNode(props: {
             }
 
             setExpanded(true);
-            if (children().length === 0) {
+            // Only load children if we don't have initial children AND haven't loaded yet
+            if (!hasInitialChildren && children().length === 0 && !hasLoadedChildren()) {
                 loadChildren();
             }
         } else {
