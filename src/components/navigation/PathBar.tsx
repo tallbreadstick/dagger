@@ -1,14 +1,3 @@
-/**
- * PathBar.tsx
- * ------------
- * A dynamic segmented path address bar similar to Windows Explorer.
- * - Neutral gray segments (no blue text)
- * - Hover highlights for segments and chevrons
- * - Editable mode for manual input or path commands (%appdata%, cmd, etc.)
- * - Uses a Portal to render dropdowns above overflow-hidden parents.
- * - Dropdowns close on outside click and have clean minimal styling.
- */
-
 import {
     createSignal,
     createEffect,
@@ -82,9 +71,8 @@ export default function PathBar(props: {
         const parts = segments().slice(0, index + 1);
         let basePath = parts.join("/");
 
-        // ✅ Fix: handle drive root (like "C:")
         if (/^[A-Za-z]:$/.test(basePath)) {
-            basePath = basePath + "/"; // e.g., "C:/"
+            basePath = basePath + "/";
         }
 
         try {
@@ -112,14 +100,15 @@ export default function PathBar(props: {
             }
 
             try {
-                const result = await invoke<{ kind: string; value: string }>("resolve_path_command", {
-                    command: cmd,
-                });
+                const result = await invoke<{ kind: string; value: string }>(
+                    "resolve_path_command",
+                    { command: cmd },
+                );
 
                 if (result.kind === "path") {
                     props.onNavigate(result.value);
                 } else if (result.kind === "action") {
-                    console.log(result.value); // or toast it later
+                    console.log(result.value);
                 }
             } catch (err) {
                 console.error("Path command failed:", err);
@@ -131,18 +120,22 @@ export default function PathBar(props: {
         }
     };
 
+    // Auto-select entire path when entering edit mode
+    createEffect(() => {
+        if (editMode() && inputRef) {
+            queueMicrotask(() => {
+                inputRef?.focus();
+                inputRef.value = props.currentPath;
+                inputRef?.select();
+            });
+        }
+    });
+
     return (
         <div
-            class="path-bar-container relative flex flex-row items-center bg-gray-200 border border-gray-300 rounded px-2 py-1 w-full cursor-text font-outfit"
-            onClick={() => {
-                if (!editMode()) {
-                    setEditMode(true);
-                    setInputValue(props.currentPath);
-                    queueMicrotask(() => inputRef?.focus());
-                }
-            }}
+            class="path-bar-container relative flex flex-row items-center bg-gray-200 border border-gray-300 rounded px-2 py-1 w-full font-outfit"
         >
-            {/* Normal segmented path */}
+            {/* Segmented Path View */}
             <Show
                 when={!editMode()}
                 fallback={
@@ -152,11 +145,24 @@ export default function PathBar(props: {
                         value={inputValue()}
                         onInput={(e) => setInputValue(e.currentTarget.value)}
                         onKeyDown={handleInputKey}
-                        class="w-full bg-transparent outline-none text-sm text-gray-900 font-outfit"
+                        class="w-full bg-transparent outline-none text-sm text-gray-900 font-outfit px-1 py-0.5"
                     />
                 }
             >
-                <div class="flex flex-row items-center overflow-x-auto no-scrollbar w-full">
+                <div
+                    class="flex flex-row items-center overflow-x-auto no-scrollbar w-full cursor-text"
+                    onDblClick={(e) => {
+                        // Only trigger edit if the click is NOT on a segment or chevron
+                        const target = e.target as HTMLElement;
+                        if (
+                            !target.closest(".path-segment") &&
+                            !target.closest(".path-chevron")
+                        ) {
+                            e.stopPropagation();
+                            setEditMode(true); // your function to enable editing
+                        }
+                    }}
+                >
                     <For each={segments()}>
                         {(segment, i) => (
                             <div class="flex flex-row items-center">
@@ -165,34 +171,32 @@ export default function PathBar(props: {
                                         e.stopPropagation();
                                         handleSegmentClick(i());
                                     }}
-                                    class="text-sm text-gray-800 font-medium px-1.5 py-0.5 rounded hover:bg-gray-300 hover:text-black transition-colors font-outfit"
+                                    class="path-segment text-sm text-gray-800 font-medium px-1.5 py-0.5 rounded hover:bg-gray-300 hover:text-black transition-colors font-outfit"
                                 >
                                     {segment}
                                 </button>
 
                                 <Show when={i() < segments().length - 1}>
-                                    <div class="relative flex items-center">
-                                        <button
-                                            class="px-1 rounded hover:bg-gray-300 transition-colors"
-                                            onClick={(e) => toggleDropdown(i(), e)}
-                                        >
-                                            <FaSolidChevronRight class="w-3.5 h-3.5 text-gray-600 hover:text-gray-800 transition-colors" />
-                                        </button>
-                                    </div>
+                                    <button
+                                        class="path-chevron px-1 rounded hover:bg-gray-300 transition-colors"
+                                        onClick={(e) => toggleDropdown(i(), e)}
+                                    >
+                                        <FaSolidChevronRight class="w-3.5 h-3.5 text-gray-600 hover:text-gray-800 transition-colors" />
+                                    </button>
                                 </Show>
                             </div>
                         )}
                     </For>
                 </div>
+
             </Show>
 
-            {/* Portal-based dropdown */}
+            {/* Dropdown Portal */}
             <Show when={dropdownIndex() !== null && dropdownPosition()}>
                 <Portal>
                     <div
                         class="pathbar-dropdown-portal absolute bg-white border border-gray-300 rounded shadow-lg z-[9999] overflow-y-auto font-outfit"
                         style={{
-                            position: "absolute",
                             left: `${dropdownPosition()!.x}px`,
                             top: `${dropdownPosition()!.y}px`,
                             width: "180px",
