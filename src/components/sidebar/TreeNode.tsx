@@ -75,7 +75,7 @@ export function TreeNode(props: {
     async function loadChildren() {
         if (!props.node.is_dir) return;
         if (hasLoadedChildren()) return; // Don't reload if already loaded
-        
+
         setLoading(true);
         try {
             const items = await listDirectoryContents(props.node.path);
@@ -135,15 +135,15 @@ export function TreeNode(props: {
     function getFileIcon(name: string) {
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
 
-        const docExts = ["pdf","doc","docx","odt","txt","rtf","md","pages","tex","log"];
-        const presExts = ["ppt","pptx","odp","key","gslides"];
-        const sheetExts = ["xls","xlsx","csv","ods","numbers"];
-        const videoExts = ["mp4","mov","m4v","mkv","avi","webm","flv","wmv","mpg","mpeg","ogv"];
-        const audioExts = ["mp3","wav","ogg","m4a","flac","aac","wma","aiff","alac"];
-        const imageExts = ["png","jpg","jpeg","gif","bmp","webp","tiff","svg","heic","ico","psd","ai","eps"];
-        const archiveExts = ["zip","7z","rar","tar","gz","bz2","xz","iso","dmg","cab","lzh","arj"];
-        const execExts = ["exe","msi","jar","bat","sh","app","bin","command","run","py","pl","rb"];
-        const codeExts = ["js","ts","html","htm","css","scss","sass","json","xml","yml","yaml","toml"];
+        const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md", "pages", "tex", "log"];
+        const presExts = ["ppt", "pptx", "odp", "key", "gslides"];
+        const sheetExts = ["xls", "xlsx", "csv", "ods", "numbers"];
+        const videoExts = ["mp4", "mov", "m4v", "mkv", "avi", "webm", "flv", "wmv", "mpg", "mpeg", "ogv"];
+        const audioExts = ["mp3", "wav", "ogg", "m4a", "flac", "aac", "wma", "aiff", "alac"];
+        const imageExts = ["png", "jpg", "jpeg", "gif", "bmp", "webp", "tiff", "svg", "heic", "ico", "psd", "ai", "eps"];
+        const archiveExts = ["zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso", "dmg", "cab", "lzh", "arj"];
+        const execExts = ["exe", "msi", "jar", "bat", "sh", "app", "bin", "command", "run", "py", "pl", "rb"];
+        const codeExts = ["js", "ts", "html", "htm", "css", "scss", "sass", "json", "xml", "yml", "yaml", "toml"];
 
         if (docExts.includes(ext)) return <FaSolidFileWord class="text-blue-400 w-3 h-3" />;
         if (presExts.includes(ext)) return <FaSolidFilePowerpoint class="text-orange-400 w-3 h-3" />;
@@ -164,14 +164,26 @@ export function TreeNode(props: {
         <div class="select-none">
             <div
                 ref={nodeRef}
-                class={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded-md transition-colors ${
-                    isActive()
+                class={`flex items-center gap-1 cursor-pointer px-2 py-1 rounded-md transition-colors ${isActive()
                         ? "bg-blue-500/30 text-white font-semibold"
                         : "hover:bg-white/10 active:bg-white/20 text-black"
-                }`}
+                    }`}
                 style={{ "padding-left": `${props.depth * 14}px` }}
-                onClick={toggleExpand}
-                onDblClick={handleDoubleClick}
+                onClick={(e) => {
+                    // Ctrl+Click (or Cmd+Click) opens immediately
+                    if (e.ctrlKey || e.metaKey) {
+                        e.stopPropagation();
+                        handleDoubleClick(e);
+                        return;
+                    }
+                    // Regular click toggles expansion
+                    toggleExpand(e);
+                }}
+                onDblClick={(e) => {
+                    e.stopPropagation();
+                    handleDoubleClick(e);
+                }}
+
             >
                 <Show when={props.node.is_dir} fallback={getFileIcon(props.node.name)}>
                     <Show when={expanded()} fallback={<FaSolidFolder class="text-gray-50 w-3 h-3" />}>
@@ -204,24 +216,24 @@ export function TreeNode(props: {
             <Show when={error()}>
                 <Portal>
                     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
-                        <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
-                        <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
-                        <div class="flex justify-end gap-2">
-                        <button
-                            class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-                            onClick={() => setError(null)}
-                        >
-                            OK
-                        </button>
-                        <button
-                            class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
-                            onClick={() => setError(null)}
-                        >
-                            Close
-                        </button>
+                        <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
+                            <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
+                            <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
+                            <div class="flex justify-end gap-2">
+                                <button
+                                    class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+                                    onClick={() => setError(null)}
+                                >
+                                    OK
+                                </button>
+                                <button
+                                    class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                                    onClick={() => setError(null)}
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
-                    </div>
                     </div>
                 </Portal>
             </Show>

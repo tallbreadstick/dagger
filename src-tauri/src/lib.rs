@@ -12,14 +12,11 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{get_tree_from_root, list_directory_contents, register_recent_access, resolve_user},
+        nav::{get_tree_from_root, register_recent_access, resolve_user},
         stream::{stream_directory_contents, StreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
-    util::{
-        caches::{HomeCache, SharedHomeCache},
-        cmd::resolve_path_command,
-    },
+    util::{cmd::resolve_path_command, HomeCache, SharedHomeCache},
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,7 +35,6 @@ pub fn run() {
             upload_document_file,
             // filesys
             register_recent_access,
-            list_directory_contents,
             get_tree_from_root,
             resolve_user,
             // stream

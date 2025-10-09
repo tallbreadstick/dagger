@@ -49,6 +49,11 @@ export default function ContentPanel(props: {
         setShowProgress(true);
         startTime = performance.now();
 
+        const normalized = path.replace(/\\/g, "/").trim();
+        const isDriveRoot =
+            normalized === "/" ||
+            /^[A-Za-z]:\/?$/.test(normalized); // matches "C:" or "C:/"
+
         if (progressTimer) cancelAnimationFrame(progressTimer);
 
         if (cancelStream) {
@@ -77,6 +82,12 @@ export default function ContentPanel(props: {
                     setFiles(Array.from(newMap.values()));
                     return newMap;
                 });
+                if (isDriveRoot) {
+                    setProgress(1);
+                    setShowProgress(false);
+                    setLoading(false);
+                    cancelStream = null;
+                }
             },
             () => {
                 setLoading(false);

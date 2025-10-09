@@ -4,7 +4,7 @@ use jwalk::WalkDir;
 use serde::{Serialize, Deserialize};
 use tauri::{AppHandle, Manager};
 
-use crate::util::caches::{load_home_cache, save_home_cache, SharedHomeCache};
+use crate::util::SharedHomeCache;
 
 /// Represents a single file or directory entry.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -229,33 +229,6 @@ pub fn get_tree_from_root(target_path: &str) -> Result<FileNode, String> {
     }
 
     Ok(build_tree_along_path(root_path, &components))
-}
-
-/// Returns immediate directory contents (non-recursive)
-#[tauri::command]
-pub fn list_directory_contents(path: &str) -> Result<Vec<FileItem>, String> {
-    let entries = fs::read_dir(path)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
-
-    let mut items: Vec<FileItem> = entries
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let metadata = entry.metadata().ok()?;
-            let is_dir = metadata.is_dir();
-            let size = if !is_dir { Some(metadata.len()) } else { None };
-            let name = entry.file_name().to_string_lossy().to_string();
-            let path = entry.path().to_string_lossy().to_string();
-            Some(FileItem { name, path, is_dir, size })
-        })
-        .collect();
-
-    items.sort_by(|a, b| match (a.is_dir, b.is_dir) {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
-    });
-
-    Ok(items)
 }
 
 #[tauri::command]
