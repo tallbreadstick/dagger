@@ -32,12 +32,19 @@ pub async fn stream_directory_contents(
     handle: AppHandle,
     state: State<'_, Arc<StreamState>>,
     pool: State<'_, Arc<rayon::ThreadPool>>,
-    path: String,
+    mut path: String,
     sort_key: String,
     ascending: bool,
     show_hidden: bool,
     request_id: u64,
 ) -> Result<(), String> {
+
+    if path.is_empty() {
+        path = if cfg!(windows) { "C:\\".to_string() } else { "/".to_string() };
+    } else if cfg!(windows) && path.ends_with(":") {
+        path.push('\\');
+    }
+
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
