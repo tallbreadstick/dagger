@@ -3,13 +3,12 @@ use std::{fs, path::PathBuf};
 use tauri::AppHandle;
 use xxhash_rust::xxh3::xxh3_64;
 
-use crate::util::get_cache_dir;
+use crate::util::caches::get_cache_dir;
 
 /// Location of the thumbnail cache DB at `%APPDATA%\dagger\caches\thumbs.db`
 fn get_thumb_db_path(handle: &AppHandle) -> PathBuf {
     let mut path = get_cache_dir(handle);
-    path.push("caches");
-    fs::create_dir_all(&path).ok();
+    fs::create_dir(&path).ok();
     path.push("thumbs.db");
     path
 }
@@ -84,7 +83,7 @@ pub fn set_thumb(
     Ok(())
 }
 
-/// Optional: remove thumbnails older than a certain mtime (cleanup).
+// Optional: remove thumbnails older than a certain mtime (cleanup).
 pub fn prune_thumbs(conn: &Connection, min_mtime: i64) -> Result<()> {
     conn.execute("DELETE FROM thumbs WHERE mtime < ?1;", [min_mtime])?;
     Ok(())

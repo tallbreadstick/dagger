@@ -16,7 +16,10 @@ use crate::{
         stream::{stream_directory_contents, StreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
-    util::{cmd::resolve_path_command, HomeCache, SharedHomeCache},
+    util::{
+        caches::{HomeCache, SharedHomeCache},
+        cmd::resolve_path_command,
+    },
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

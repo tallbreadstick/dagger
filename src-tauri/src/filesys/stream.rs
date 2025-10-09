@@ -1,4 +1,7 @@
-use crate::util::{ffutils::ffmpeg_init, get_thumb, hash_path, open_thumb_db, set_thumb};
+use crate::util::{
+    caches::{get_thumb, hash_path, open_thumb_db, set_thumb},
+    ffutils::ffmpeg_init,
+};
 use base64::{engine::GeneralPurpose, Engine};
 use image::ImageReader;
 use jwalk::WalkDir;

@@ -4,7 +4,7 @@ use jwalk::WalkDir;
 use serde::{Serialize, Deserialize};
 use tauri::{AppHandle, Manager};
 
-use crate::util::SharedHomeCache;
+use crate::util::caches::SharedHomeCache;
 
 /// Represents a single file or directory entry.
 #[derive(Serialize, Deserialize, Clone, Debug)]
