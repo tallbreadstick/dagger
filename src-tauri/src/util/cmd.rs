@@ -13,7 +13,15 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
 
     let cmd = command.trim();
 
-    // --- Handle environment variables like %appdata%, %localappdata%, etc. ---
+    // --- Special virtual path: Home ---
+    if cmd.eq_ignore_ascii_case("home") {
+        return Ok(ResolveResult {
+            kind: "path".into(),
+            value: "Home".into(), // internal identifier for Home
+        });
+    }
+
+    // --- Handle environment variables like %APPDATA%, %LOCALAPPDATA%, etc. ---
     if cmd.starts_with('%') && cmd.ends_with('%') {
         let var_name = &cmd[1..cmd.len() - 1].to_ascii_uppercase();
 
@@ -82,7 +90,7 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
         _ => {}
     }
 
-    // --- Handle normal path ---
+    // --- Handle normal filesystem path ---
     let path = PathBuf::from(cmd);
     if path.exists() {
         Ok(ResolveResult {

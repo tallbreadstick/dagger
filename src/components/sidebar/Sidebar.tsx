@@ -9,7 +9,8 @@ import {
     FaSolidDesktop,
     FaSolidPhotoFilm,
     FaSolidMusic,
-    FaSolidVideo
+    FaSolidVideo,
+    FaSolidHouse
 } from "solid-icons/fa";
 
 export default function Sidebar(props: {
@@ -29,6 +30,7 @@ export default function Sidebar(props: {
         try {
             const home = await resolveUserHome();
             setQuickAccess([
+                { name: "Home", path: 'Home', icon: FaSolidHouse },
                 { name: "Documents", path: `${home}\\Documents`, icon: FaSolidFolder },
                 { name: "Downloads", path: `${home}\\Downloads`, icon: FaSolidDownload },
                 { name: "Desktop", path: `${home}\\Desktop`, icon: FaSolidDesktop },

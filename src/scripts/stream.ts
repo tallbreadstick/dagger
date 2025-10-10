@@ -10,6 +10,7 @@ export type FileChunk = {
     filetype?: string;
     thumbnail?: string | null;
     date_modified?: number | undefined;
+    pinned?: boolean;
 };
 
 export type StreamOptions = {

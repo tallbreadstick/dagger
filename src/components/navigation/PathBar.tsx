@@ -4,6 +4,7 @@ import {
     For,
     Show,
     onCleanup,
+    onMount,
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,13 +30,19 @@ export default function PathBar(props: {
     // Parse current path into segments
     createEffect(() => {
         const path = props.currentPath;
-        if (!editMode()) {
-            const parts = path
-                .replace(/\\/g, "/")
-                .split("/")
-                .filter((p) => p.length > 0);
-            setSegments(parts);
+        if (editMode()) return;
+
+        // Handle virtual "Home" route
+        if (path === "HOME_CACHE") {
+            setSegments(["Home"]);
+            return;
         }
+
+        const parts = path
+            .replace(/\\/g, "/")
+            .split("/")
+            .filter((p) => p.length > 0);
+        setSegments(parts);
     });
 
     // Handle outside clicks for edit mode & dropdown
@@ -51,8 +58,10 @@ export default function PathBar(props: {
             }
         }
     };
-    document.addEventListener("click", handleClickOutside);
-    onCleanup(() => document.removeEventListener("click", handleClickOutside));
+    onMount(() => {
+        document.addEventListener("click", handleClickOutside);
+        onCleanup(() => document.removeEventListener("click", handleClickOutside));
+    });
 
     const handleSegmentClick = (index: number) => {
         const parts = segments().slice(0, index + 1);
@@ -163,30 +172,38 @@ export default function PathBar(props: {
                         }
                     }}
                 >
-                    <For each={segments()}>
-                        {(segment, i) => (
-                            <div class="flex flex-row items-center">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSegmentClick(i());
-                                    }}
-                                    class="path-segment text-sm text-gray-800 font-medium px-1.5 py-0.5 rounded hover:bg-gray-300 hover:text-black transition-colors font-outfit"
-                                >
-                                    {segment}
-                                </button>
+                    <Show
+                        when={segments().length === 1 && segments()[0] === "Home"}
+                        fallback={
+                            <For each={segments()}>
+                                {(segment, i) => (
+                                    <div class="flex flex-row items-center">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSegmentClick(i());
+                                            }}
+                                            class="path-segment text-sm text-gray-800 font-medium px-1.5 py-0.5 rounded hover:bg-gray-300 hover:text-black transition-colors font-outfit"
+                                        >
+                                            {segment}
+                                        </button>
 
-                                <Show when={i() < segments().length - 1}>
-                                    <button
-                                        class="path-chevron px-1 rounded hover:bg-gray-300 transition-colors"
-                                        onClick={(e) => toggleDropdown(i(), e)}
-                                    >
-                                        <FaSolidChevronRight class="w-3.5 h-3.5 text-gray-600 hover:text-gray-800 transition-colors" />
-                                    </button>
-                                </Show>
-                            </div>
-                        )}
-                    </For>
+                                        <Show when={i() < segments().length - 1}>
+                                            <button
+                                                class="path-chevron px-1 rounded hover:bg-gray-300 transition-colors"
+                                                onClick={(e) => toggleDropdown(i(), e)}
+                                            >
+                                                <FaSolidChevronRight class="w-3.5 h-3.5 text-gray-600 hover:text-gray-800 transition-colors" />
+                                            </button>
+                                        </Show>
+                                    </div>
+                                )}
+                            </For>
+                        }
+                    >
+                        <div class="text-sm font-medium text-gray-800 px-1.5 py-0.5">🏠 Home</div>
+                    </Show>
+
                 </div>
 
             </Show>

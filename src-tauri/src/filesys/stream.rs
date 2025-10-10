@@ -7,12 +7,10 @@ use image::ImageReader;
 use jwalk::WalkDir;
 use rayon::prelude::*;
 use std::{
-    path::Path,
-    sync::{
+    fs, path::Path, sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
-    },
-    time::Duration,
+    }, time::{Duration, UNIX_EPOCH}
 };
 use tauri::{AppHandle, Emitter, State};
 
@@ -42,6 +40,10 @@ pub async fn stream_directory_contents(
     show_hidden: bool,
     request_id: u64,
 ) -> Result<(), String> {
+
+    if path == "Home" {
+        return stream_home_directory(handle, cache_state, request_id).await;
+    }
 
     if path.is_empty() {
         // Default to root depending on OS
@@ -279,6 +281,126 @@ pub async fn stream_directory_contents(
             serde_json::json!({ "request_id": request_id, "path": path }),
         );
     }
+
+    Ok(())
+}
+
+pub async fn stream_home_directory(
+    handle: AppHandle,
+    cache_state: State<'_, SharedHomeCache>,
+    request_id: u64,
+) -> Result<(), String> {
+    let cache = cache_state.0.read().await;
+    let path = "Home".to_string();
+
+    // --- Phase 1: emit metadata for cached files ---
+    for item in cache.recent_files.iter() {
+        let modified = fs::metadata(&item.path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+        let filetype = item.name.rsplit('.').next().unwrap_or("").to_string();
+        let _ = handle.emit(
+            "file-metadata",
+            serde_json::json!({
+                "request_id": request_id,
+                "name": item.name,
+                "path": item.path,
+                "is_dir": false,
+                "size": item.size,
+                "filetype": filetype,
+                "date_modified": modified,
+            }),
+        );
+    }
+
+    for item in cache.recent_dirs.iter() {
+        let modified = fs::metadata(&item.path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+        let filetype = item.name.rsplit('.').next().unwrap_or("").to_string();
+        let _ = handle.emit(
+            "file-metadata",
+            serde_json::json!({
+                "request_id": request_id,
+                "name": item.name,
+                "path": item.path,
+                "is_dir": true,
+                "size": item.size,
+                "filetype": filetype,
+                "date_modified": modified,
+            }),
+        );
+    }
+
+    for item in cache.recent_files.iter() {
+        let modified = fs::metadata(&item.path)
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+        let filetype = item.name.rsplit('.').next().unwrap_or("").to_string();
+        let _ = handle.emit(
+            "file-metadata",
+            serde_json::json!({
+                "request_id": request_id,
+                "name": item.name,
+                "path": item.path,
+                "is_dir": false,
+                "size": item.size,
+                "filetype": filetype,
+                "date_modified": modified,
+                "pinned": true
+            }),
+        );
+    }
+
+    let _ = handle.emit(
+        "file-metadata-complete",
+        serde_json::json!({
+            "request_id": request_id,
+            "path": path,
+        }),
+    );
+
+    // --- Phase 2: emit thumbnails directly from cache ---
+    for item in cache.recent_files.iter() {
+        if let Some(thumb) = &item.thumbnail {
+            let _ = handle.emit(
+                "file-thumbnail",
+                serde_json::json!({
+                    "request_id": request_id,
+                    "path": item.path,
+                    "thumbnail": thumb,
+                }),
+            );
+        }
+    }
+
+    for item in cache.pinned_items.iter() {
+        if let Some(thumb) = &item.thumbnail {
+            let _ = handle.emit(
+                "file-thumbnail",
+                serde_json::json!({
+                    "request_id": request_id,
+                    "path": item.path,
+                    "thumbnail": thumb,
+                }),
+            );
+        }
+    }
+
+    // --- Phase 3: signal completion ---
+    let _ = handle.emit(
+        "file-stream-complete",
+        serde_json::json!({
+            "request_id": request_id,
+            "path": path,
+        }),
+    );
 
     Ok(())
 }

@@ -15,7 +15,6 @@ import {
     FaSolidFolder,
     FaSolidPlay
 } from "solid-icons/fa";
-import Tab from "../../classes/Tab";
 import { LazyImage } from "../LazyImage";
 import { openFromPath } from "../../scripts/navigation";
 
@@ -41,6 +40,10 @@ export default function ContentPanel(props: {
 
     let cancelStream: (() => Promise<void>) | null = null;
 
+    // 🧩 Detect special home path
+    const isHomePath = () => props.currentTab?.tab.workingDir === "Home";
+
+    // --- STREAM LOGIC ---
     const loadDirectory = async (path: string) => {
         setFileMap(new Map());
         setFiles([]);
@@ -50,18 +53,14 @@ export default function ContentPanel(props: {
         startTime = performance.now();
 
         const normalized = path.replace(/\\/g, "/").trim();
-        const isDriveRoot =
-            normalized === "/" ||
-            /^[A-Za-z]:\/?$/.test(normalized); // matches "C:" or "C:/"
+        const isDriveRoot = normalized === "/" || /^[A-Za-z]:\/?$/.test(normalized);
 
         if (progressTimer) cancelAnimationFrame(progressTimer);
-
         if (cancelStream) {
             await cancelStream();
             cancelStream = null;
         }
 
-        // 🕒 Fake smooth progress
         function simulateProgress() {
             if (!startTime) return;
             const elapsed = (performance.now() - startTime) / 1000;
@@ -73,7 +72,6 @@ export default function ContentPanel(props: {
 
         const unlisten = await streamDirectoryContents(
             path,
-            // Phase 1: metadata
             (chunk: FileChunk) => {
                 if (!props.showHidden && chunk.name.startsWith('.')) return;
                 setFileMap(prev => {
@@ -89,10 +87,7 @@ export default function ContentPanel(props: {
                     cancelStream = null;
                 }
             },
-            () => {
-                setLoading(false);
-            },
-            // Phase 2: thumbnails
+            () => setLoading(false),
             (filePath: string, thumbnail: string | null) => {
                 setFileMap(prev => {
                     const newMap = new Map(prev);
@@ -104,7 +99,6 @@ export default function ContentPanel(props: {
                     return newMap;
                 });
             },
-            // Phase 3: complete
             () => {
                 if (progressTimer) cancelAnimationFrame(progressTimer);
                 setProgress(1);
@@ -126,20 +120,24 @@ export default function ContentPanel(props: {
         props.ascending();
         props.showHidden();
         props.refresh?.();
-        if (path) await loadDirectory(path);
-        else setFiles([]);
+        if (!path) return setFiles([]);
+        await loadDirectory(path);
     });
 
     onCleanup(async () => {
         if (cancelStream) await cancelStream();
     });
 
+    function getIconSize() {
+        return props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5';
+    }
+
     function getFileIcon(file: FileChunk) {
         const name = file.name;
+        const iconSize = getIconSize();
 
-        if (file.is_dir) {
-            return <FaSolidFolder class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-300 mb-1`} />;
-        }
+        if (file.is_dir)
+            return <FaSolidFolder class={`${iconSize} text-blue-300 mb-1`} />;
 
         const ext = name.split(".").pop()?.toLowerCase() ?? "";
         const docExts = ["pdf", "doc", "docx", "odt", "txt", "rtf", "md", "pages", "tex", "log"];
@@ -161,84 +159,136 @@ export default function ContentPanel(props: {
                     <LazyImage
                         src={`data:image;base64,${file.thumbnail}`}
                         alt={name}
-                        class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} object-cover rounded`}
+                        class={`${iconSize} object-cover rounded`}
                     />
                     {isVideo && (
                         <div class="absolute inset-0 flex items-center justify-center">
-                            <FaSolidPlay
-                                class={`text-white opacity-80 ${
-                                    props.viewMode() === 'grid' ? 'w-6 h-6' : 'w-3 h-3'
-                                }`}
-                            />
+                            <FaSolidPlay class={`text-white opacity-80 ${props.viewMode() === 'grid' ? 'w-6 h-6' : 'w-3 h-3'}`} />
                         </div>
                     )}
                 </div>
             );
         }
 
-        if (docExts.includes(ext)) return <FaSolidFileWord class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-blue-400 mb-1`} />;
-        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-orange-400 mb-1`} />;
-        if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-green-400 mb-1`} />;
-        if (videoExts.includes(ext)) return <FaSolidFileVideo class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-purple-400 mb-1`} />;
-        if (audioExts.includes(ext)) return <FaSolidFileAudio class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-indigo-400 mb-1`} />;
-        if (imageExts.includes(ext)) return <FaSolidFileImage class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-pink-400 mb-1`} />;
-        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-yellow-400 mb-1`} />;
-        if (execExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-red-400 mb-1`} />;
-        if (codeExts.includes(ext)) return <FaSolidFileCode class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-600 mb-1`} />;
+        // Generic icon fallback with responsive size
+        if (docExts.includes(ext)) return <FaSolidFileWord class={`text-blue-400 ${iconSize}`} />;
+        if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`text-orange-400 ${iconSize}`} />;
+        if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`text-green-400 ${iconSize}`} />;
+        if (videoExts.includes(ext)) return <FaSolidFileVideo class={`text-purple-400 ${iconSize}`} />;
+        if (audioExts.includes(ext)) return <FaSolidFileAudio class={`text-indigo-400 ${iconSize}`} />;
+        if (imageExts.includes(ext)) return <FaSolidFileImage class={`text-pink-400 ${iconSize}`} />;
+        if (archiveExts.includes(ext)) return <FaSolidBoxArchive class={`text-yellow-400 ${iconSize}`} />;
+        if (execExts.includes(ext)) return <FaSolidFileCode class={`text-red-400 ${iconSize}`} />;
+        if (codeExts.includes(ext)) return <FaSolidFileCode class={`text-gray-600 ${iconSize}`} />;
 
-        return <FaSolidFile class={`${props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5'} text-gray-500 mb-1`} />;
+        return <FaSolidFile class={`text-gray-500 ${iconSize}`} />;
     }
 
-    const formatDate = (timestampSec?: number) => {
-        if (timestampSec == null) return "";
-        const d = new Date(timestampSec * 1000); // <-- multiply by 1000
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ` +
-            `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    };
-
-    function updateTab(entry: TabEntry, updater: (tab: Tab) => Tab) {
-        if (!entry) return;
-        const newTab = updater(entry.tab);
-        entry.setTab(newTab);
-    }
+    const formatDate = (t?: number) =>
+        t ? new Date(t * 1000).toLocaleString() : "";
 
     function handleNavigate(path: string) {
         const entry = props.currentTab;
         if (!entry) return;
-        updateTab(entry, (tab) => {
-            const newTab = tab.clone();
-            newTab.navigateTo(path);
-            return newTab;
-        });
+        const newTab = entry.tab.clone();
+        newTab.navigateTo(path);
+        entry.setTab(newTab);
     }
 
     const handleDoubleClick = (file: FileChunk) => {
         if (!props.currentTab) return;
         if (file.is_dir) handleNavigate(file.path);
-        else openFromPath(file.path).catch((err) => setError(err));
+        else openFromPath(file.path).catch(err => setError(err));
     };
 
-    return (
-        <div class="flex-1 flex flex-col h-full overflow-hidden">
-            <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
-                <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
-                    <div
-                        class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 to-blue-300 shadow-[0_0_10px_rgba(96,165,250,0.7)] transition-all duration-300 ease-out"
-                        style={{ width: `${progress() * 100}%`, opacity: progress() >= 1 ? 0 : 1 }}
-                    />
-                </div>
-            </Show>
+    // 🏠 Special HOME layout
+    const renderHomeLayout = () => {
+        const dirs = files().filter(f => !f.pinned && f.is_dir).slice(0, 12);
+        const pinned = files().filter(f => f.pinned);
+        const recents = files().filter(f => !f.pinned && !f.is_dir).slice(0, 20);
 
-            <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
-                <Show when={!loading()}>
-                    <div
-                        class={`${props.viewMode() === 'grid' ? 'grid gap-3 justify-items-center' : 'flex flex-col gap-1'}`}
-                        style={props.viewMode() === 'grid' ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));' : undefined}
-                    >
-                        <For each={files()}>{(file) => (
+        return (
+            <div class="flex flex-col h-full w-full p-3 overflow-auto gap-4 custom-scrollbar">
+                {/* TOP: Recent Dirs Grid */}
+                <Show when={dirs.length}>
+                    <div>
+                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Recent Directories</h2>
+                        <div class="grid gap-3 grid-cols-6">
+                            <For each={dirs}>
+                                {(f) => (
+                                    <div
+                                        onDblClick={() => handleDoubleClick(f)}
+                                        class="flex flex-col items-center p-2 bg-white/80 rounded shadow hover:bg-blue-50 cursor-pointer"
+                                    >
+                                        {getFileIcon(f)}
+                                        <div class="truncate text-xs mt-1 w-full text-center">{f.name}</div>
+                                    </div>
+                                )}
+                            </For>
+                        </div>
+                    </div>
+                </Show>
+
+                {/* MIDDLE: Pinned Items */}
+                <Show when={pinned.length}>
+                    <div>
+                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Pinned</h2>
+                        <div class="flex flex-col gap-1">
+                            <For each={pinned}>
+                                {(f) => (
+                                    <div
+                                        onDblClick={() => handleDoubleClick(f)}
+                                        class="flex flex-row items-center p-2 bg-white/70 rounded hover:bg-blue-50 cursor-pointer"
+                                    >
+                                        {getFileIcon(f)}
+                                        <div class="flex-1 ml-2 text-xs truncate">{f.name}</div>
+                                    </div>
+                                )}
+                            </For>
+                        </div>
+                    </div>
+                </Show>
+
+                {/* BOTTOM: Recent Files */}
+                <Show when={recents.length}>
+                    <div>
+                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Recent Files</h2>
+                        <div class="flex flex-col gap-1">
+                            <For each={recents}>
+                                {(f) => (
+                                    <div
+                                        onDblClick={() => handleDoubleClick(f)}
+                                        class="flex flex-row items-center p-2 bg-white/60 rounded hover:bg-blue-50 cursor-pointer"
+                                    >
+                                        {getFileIcon(f)}
+                                        <div class="flex-1 ml-2 text-xs truncate">{f.name}</div>
+                                        <div class="text-gray-500 text-xs">{formatDate(f.date_modified)}</div>
+                                    </div>
+                                )}
+                            </For>
+                        </div>
+                    </div>
+                </Show>
+            </div>
+        );
+    };
+
+    // 🧱 Default layout
+    const renderNormalLayout = () => (
+        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
+            <Show when={!loading()}>
+                <div
+                    class={`${props.viewMode() === 'grid' ? 'grid gap-3 justify-items-center' : 'flex flex-col gap-1'}`}
+                    style={props.viewMode() === 'grid' ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));' : undefined}
+                >
+                    <For each={files()}>
+                        {(file) => (
                             <div
                                 onDblClick={() => handleDoubleClick(file)}
-                                class={`flex ${props.viewMode() === 'grid' ? 'flex-col items-center p-2 bg-white/80' : 'flex-row items-center p-1 bg-white/40'} rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
+                                class={`flex ${props.viewMode() === 'grid'
+                                    ? 'flex-col items-center p-2 bg-white/80'
+                                    : 'flex-row items-center p-1 bg-white/40'
+                                    } rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
                                 title={file.name}
                             >
                                 {getFileIcon(file)}
@@ -259,25 +309,42 @@ export default function ContentPanel(props: {
                                     </div>
                                 )}
                             </div>
-                        )}</For>
-                    </div>
-                </Show>
+                        )}
+                    </For>
+                </div>
+            </Show>
+        </div>
+    );
 
-                <Show when={error()}>
-                    <Portal>
-                        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                            <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
-                                <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
-                                <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
-                                <div class="flex justify-end gap-2">
-                                    <button class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm" onClick={() => setError(null)}>OK</button>
-                                    <button class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm" onClick={() => setError(null)}>Close</button>
-                                </div>
+    return (
+        <div class="flex-1 flex flex-col h-full overflow-hidden">
+            <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
+                <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
+                    <div
+                        class="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-400 to-blue-300 transition-all duration-300 ease-out"
+                        style={{ width: `${progress() * 100}%`, opacity: progress() >= 1 ? 0 : 1 }}
+                    />
+                </div>
+            </Show>
+
+            <Show when={isHomePath()} fallback={renderNormalLayout()}>
+                {renderHomeLayout()}
+            </Show>
+
+            <Show when={error()}>
+                <Portal>
+                    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                        <div class="bg-white rounded-md p-4 shadow-lg w-80 max-w-full">
+                            <h2 class="font-semibold text-lg mb-2 text-red-500">Error</h2>
+                            <p class="text-sm text-gray-700 break-words mb-4">{error()}</p>
+                            <div class="flex justify-end gap-2">
+                                <button class="px-3 py-1.5 bg-gray-200 rounded hover:bg-gray-300 text-sm" onClick={() => setError(null)}>OK</button>
+                                <button class="px-3 py-1.5 bg-red-500 text-white rounded hover:bg-red-600 text-sm" onClick={() => setError(null)}>Close</button>
                             </div>
                         </div>
-                    </Portal>
-                </Show>
-            </div>
+                    </div>
+                </Portal>
+            </Show>
         </div>
     );
 }

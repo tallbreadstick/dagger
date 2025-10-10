@@ -15,11 +15,11 @@ const MAX_RECENT_DIRS: usize = 12;
 pub struct HomeCache {
     pub recent_files: VecDeque<FileItemWithThumbnail>,
     pub recent_dirs: VecDeque<FileItem>,
-    pub pinned_items: Vec<FileItem>,
+    pub pinned_items: Vec<FileItemWithThumbnail>,
 }
 
 #[derive(Clone, Default)]
-pub struct SharedHomeCache(Arc<RwLock<HomeCache>>);
+pub struct SharedHomeCache(pub Arc<RwLock<HomeCache>>);
 
 impl SharedHomeCache {
     pub fn new(cache: HomeCache) -> Self {
@@ -38,6 +38,10 @@ impl SharedHomeCache {
 
     /// Add a recent file, deduplicate, and cap the deque
     pub async fn push_recent_file(&self, item: FileItemWithThumbnail) {
+        if is_root_path(&item.path) {
+            return; // skip root paths
+        }
+
         let mut cache = self.0.write().await;
         cache.recent_files.retain(|x| x.path != item.path);
         cache.recent_files.push_front(item);
@@ -48,6 +52,10 @@ impl SharedHomeCache {
 
     /// Add a recent directory, deduplicate, and cap the deque
     pub async fn push_recent_dir(&self, item: FileItem) {
+        if is_root_path(&item.path) {
+            return; // skip root paths
+        }
+
         let mut cache = self.0.write().await;
         cache.recent_dirs.retain(|x| x.path != item.path);
         cache.recent_dirs.push_front(item);
@@ -56,6 +64,7 @@ impl SharedHomeCache {
         }
     }
 }
+
 /// Location of the home cache JSON file
 fn get_home_cache_path(handle: &AppHandle) -> PathBuf {
     let mut path = get_cache_dir(handle);
@@ -84,8 +93,24 @@ pub fn save_home_cache(handle: &AppHandle, cache: &HomeCache) {
     let path = get_home_cache_path(handle);
     let tmp_path = path.with_extension("tmp");
 
-    let serialized = serde_json::to_string_pretty(cache).unwrap();
+    let serialized = serde_json::to_string(cache).unwrap();
 
     fs::write(&tmp_path, serialized).unwrap_or_else(|_| panic!("Failed to write temp home cache"));
     fs::rename(&tmp_path, &path).unwrap_or_else(|_| panic!("Failed to rename temp cache file"));
+}
+
+/// Helper function: returns true if a path is a root path
+fn is_root_path(path: &str) -> bool {
+    let p = path.replace("\\", "/"); // normalize slashes
+    if p == "/" {
+        return true; // Linux/Mac root
+    }
+    // Windows root like "C:" or "C:/"
+    if p.len() == 2 && p.chars().nth(1) == Some(':') {
+        return true;
+    }
+    if p.len() == 3 && &p[1..] == ":/" {
+        return true;
+    }
+    false
 }

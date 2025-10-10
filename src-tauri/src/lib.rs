@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
 use rayon::ThreadPoolBuilder;
-#[cfg(target_os = "windows")]
-use tauri::Emitter;
-use tauri::Manager;
-use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 pub mod filesys;
 pub mod search;
@@ -12,21 +8,17 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{get_tree_from_root, resolve_user, open_from_path},
+        nav::{get_tree_from_root, open_from_path, list_directory_contents, resolve_user},
         stream::{stream_directory_contents, StreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
-    util::{
-        caches::SharedHomeCache,
-        cmd::resolve_path_command,
-    },
+    util::{cmd::resolve_path_command, setup::setup_app_environment},
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(SharedHomeCache::default())
         .manage(Arc::new(StreamState::default()))
         .manage(Arc::new(
             ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
@@ -40,41 +32,13 @@ pub fn run() {
             get_tree_from_root,
             resolve_user,
             open_from_path,
+            list_directory_contents,
             // stream
             stream_directory_contents,
             // util
             resolve_path_command
         ])
-        .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
-
-            // Apply acrylic initially
-            #[cfg(target_os = "windows")]
-            apply_acrylic(&window, Some((0, 0, 0, 20))).unwrap();
-
-            // Clone window handle for use inside closure
-            let win_clone = window.clone();
-
-            window.on_window_event(move |event| match event {
-                tauri::WindowEvent::Focused(true) => {
-                    #[cfg(target_os = "windows")]
-                    {
-                        let _ = win_clone.emit("window-focus", ());
-                        apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
-                    }
-                }
-                tauri::WindowEvent::Focused(false) => {
-                    #[cfg(target_os = "windows")]
-                    {
-                        let _ = win_clone.emit("window-blur", ());
-                        clear_acrylic(&win_clone).ok();
-                    }
-                }
-                _ => {}
-            });
-
-            Ok(())
-        })
+        .setup(|app| setup_app_environment(app).map_err(|e| e.into()))
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

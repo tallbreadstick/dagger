@@ -99,10 +99,10 @@ pub async fn register_recent_access(
         } else if ["png", "jpg", "jpeg", "gif", "bmp"].contains(&ext.as_str()) {
             match fs::read(&path) {
                 Ok(bytes) => {
-                    if let Ok(reader) = ImageReader::new(Cursor::new(&bytes)).with_guessed_format() {
+                    if let Ok(reader) = ImageReader::new(Cursor::new(&bytes)).with_guessed_format()
+                    {
                         if let Ok(img) = reader.decode() {
-                            let thumb =
-                                img.resize(128, 128, image::imageops::FilterType::Nearest);
+                            let thumb = img.resize(128, 128, image::imageops::FilterType::Nearest);
                             let mut buf = Vec::new();
                             if thumb
                                 .write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Jpeg)
@@ -295,6 +295,47 @@ pub fn get_tree_from_root(target_path: &str) -> Result<FileNode, String> {
     }
 
     Ok(build_tree_along_path(root_path, &components))
+}
+
+/// Returns immediate directory contents (non-recursive)
+
+#[tauri::command]
+
+pub fn list_directory_contents(path: &str) -> Result<Vec<FileItem>, String> {
+    let entries = fs::read_dir(path).map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    let mut items: Vec<FileItem> = entries
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+
+            let metadata = entry.metadata().ok()?;
+
+            let is_dir = metadata.is_dir();
+
+            let size = if !is_dir { Some(metadata.len()) } else { None };
+
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            let path = entry.path().to_string_lossy().to_string();
+
+            Some(FileItem {
+                name,
+                path,
+                is_dir,
+                size,
+            })
+        })
+        .collect();
+
+    items.sort_by(|a, b| match (a.is_dir, b.is_dir) {
+        (true, false) => std::cmp::Ordering::Less,
+
+        (false, true) => std::cmp::Ordering::Greater,
+
+        _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    });
+
+    Ok(items)
 }
 
 #[tauri::command]

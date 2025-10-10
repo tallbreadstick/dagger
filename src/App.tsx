@@ -70,14 +70,14 @@ export default function App() {
 
     // tabs array (store) — array of TabEntry
     const [tabs, setTabs] = createStore<TabEntry[]>([
-        makeTab("C:\\Users\\ACER\\Documents"),
+        makeTab("Home")
     ]);
 
     // current tab points to a TabEntry (or null)
     const [currentTab, setCurrentTab] = createSignal<TabEntry | null>(tabs[0] ?? null);
 
     // helpers: add/close/duplicate tabs — App owns state
-    function addTab(path = "C:") {
+    function addTab(path = "Home") {
         const entry = makeTab(path);
         setTabs((prev) => [...prev, entry]);
         // Important: after store updates, re-bind currentTab
