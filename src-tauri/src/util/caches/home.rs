@@ -93,7 +93,7 @@ pub fn save_home_cache(handle: &AppHandle, cache: &HomeCache) {
     let path = get_home_cache_path(handle);
     let tmp_path = path.with_extension("tmp");
 
-    let serialized = serde_json::to_string(cache).unwrap();
+    let serialized = serde_json::to_string_pretty(cache).unwrap();
 
     fs::write(&tmp_path, serialized).unwrap_or_else(|_| panic!("Failed to write temp home cache"));
     fs::rename(&tmp_path, &path).unwrap_or_else(|_| panic!("Failed to rename temp cache file"));

@@ -157,6 +157,7 @@ pub async fn stream_directory_contents(
                 "date_modified": modified
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|d| d.as_secs()),
+                "pinned": false
             }),
         );
     }
@@ -311,6 +312,7 @@ pub async fn stream_home_directory(
                 "size": item.size,
                 "filetype": filetype,
                 "date_modified": modified,
+                "pinned": false
             }),
         );
     }
@@ -332,11 +334,12 @@ pub async fn stream_home_directory(
                 "size": item.size,
                 "filetype": filetype,
                 "date_modified": modified,
+                "pinned": false
             }),
         );
     }
 
-    for item in cache.recent_files.iter() {
+    for item in cache.pinned_items.iter() {
         let modified = fs::metadata(&item.path)
             .and_then(|m| m.modified())
             .ok()

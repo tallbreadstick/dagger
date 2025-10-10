@@ -29,6 +29,7 @@ export default function ContentPanel(props: {
     refresh?: Accessor<number>;
     setRefresh?: Setter<number>;
 }) {
+    
     const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
@@ -203,9 +204,9 @@ export default function ContentPanel(props: {
 
     // 🏠 Special HOME layout
     const renderHomeLayout = () => {
-        const dirs = files().filter(f => !f.pinned && f.is_dir).slice(0, 12);
+        const dirs = files().filter(f => !f.pinned && f.is_dir);
         const pinned = files().filter(f => f.pinned);
-        const recents = files().filter(f => !f.pinned && !f.is_dir).slice(0, 20);
+        const recents = files().filter(f => !f.pinned && !f.is_dir);
 
         return (
             <div class="flex flex-col h-full w-full p-3 overflow-auto gap-4 custom-scrollbar">
