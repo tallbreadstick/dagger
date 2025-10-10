@@ -45,3 +45,17 @@ export async function resolveUserHome(): Promise<string> {
     throw err;
   }
 }
+
+/**
+ * Opens a file or directory using the system default handler.
+ * Also registers the access in the recent list on the backend.
+ * @param path - The absolute path to open.
+ */
+export async function openFromPath(path: string): Promise<void> {
+  try {
+    await invoke("open_from_path", { path });
+  } catch (err) {
+    console.error(`Failed to open path "${path}":`, err);
+    throw err;
+  }
+}

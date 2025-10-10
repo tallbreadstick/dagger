@@ -1,5 +1,5 @@
 import { createEffect, createSignal, For, Show, onMount } from "solid-js";
-import { listDirectoryContents, FileNode } from "../../scripts/navigation";
+import { listDirectoryContents, FileNode, openFromPath } from "../../scripts/navigation";
 import {
     FaSolidFolder,
     FaSolidFolderOpen,
@@ -13,7 +13,6 @@ import {
     FaSolidFileCode,
     FaSolidFilePowerpoint,
 } from "solid-icons/fa";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { Portal } from "solid-js/web";
 
 export function TreeNode(props: {
@@ -125,7 +124,7 @@ export function TreeNode(props: {
         if (props.node.is_dir) {
             props.onNavigate(props.node.path);
         } else {
-            openPath(props.node.path).catch((err) => {
+            openFromPath(props.node.path).catch((err) => {
                 console.error("Failed to open file:", err);
                 setError(String(err)); // trigger popup
             });

@@ -4,6 +4,7 @@ use std::{collections::VecDeque, fs, io::Read, path::PathBuf};
 use tauri::AppHandle;
 use tokio::sync::RwLock;
 
+use crate::filesys::nav::FileItemWithThumbnail;
 use crate::util::caches::get_cache_dir;
 use crate::{filesys::nav::FileItem};
 
@@ -12,7 +13,7 @@ const MAX_RECENT_DIRS: usize = 12;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct HomeCache {
-    pub recent_files: VecDeque<FileItem>,
+    pub recent_files: VecDeque<FileItemWithThumbnail>,
     pub recent_dirs: VecDeque<FileItem>,
     pub pinned_items: Vec<FileItem>,
 }
@@ -36,7 +37,7 @@ impl SharedHomeCache {
     }
 
     /// Add a recent file, deduplicate, and cap the deque
-    pub async fn push_recent_file(&self, item: FileItem) {
+    pub async fn push_recent_file(&self, item: FileItemWithThumbnail) {
         let mut cache = self.0.write().await;
         cache.recent_files.retain(|x| x.path != item.path);
         cache.recent_files.push_front(item);
@@ -55,7 +56,6 @@ impl SharedHomeCache {
         }
     }
 }
-
 /// Location of the home cache JSON file
 fn get_home_cache_path(handle: &AppHandle) -> PathBuf {
     let mut path = get_cache_dir(handle);

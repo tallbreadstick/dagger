@@ -1,7 +1,7 @@
-use crate::util::{
-    caches::{get_thumb, hash_path, open_thumb_db, set_thumb},
+use crate::{filesys::nav::register_recent_access, util::{
+    caches::{get_thumb, hash_path, open_thumb_db, set_thumb, SharedHomeCache},
     ffutils::ffmpeg_init,
-};
+}};
 use base64::{engine::GeneralPurpose, Engine};
 use image::ImageReader;
 use jwalk::WalkDir;
@@ -35,12 +35,14 @@ pub async fn stream_directory_contents(
     handle: AppHandle,
     state: State<'_, Arc<StreamState>>,
     pool: State<'_, Arc<rayon::ThreadPool>>,
+    cache_state: State<'_, SharedHomeCache>,
     mut path: String,
     sort_key: String,
     ascending: bool,
     show_hidden: bool,
     request_id: u64,
 ) -> Result<(), String> {
+
     if path.is_empty() {
         // Default to root depending on OS
         path = if cfg!(windows) {
@@ -56,6 +58,16 @@ pub async fn stream_directory_contents(
 
         // Also normalize forward slashes to backslashes (in case frontend sent them)
         path = path.replace('/', "\\");
+    }
+
+    // Verify the directory is valid
+    if !Path::new(&path).is_dir() {
+        return Err(format!("Path is not a valid directory: {}", path));
+    }
+
+    // ✅ Register the access in recents
+    if let Err(e) = register_recent_access(&handle, &cache_state, path.clone()).await {
+        eprintln!("Failed to register recent access: {}", e);
     }
 
     state.current_id.store(request_id, Ordering::Relaxed);

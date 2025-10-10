@@ -12,12 +12,12 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{get_tree_from_root, register_recent_access, resolve_user},
+        nav::{get_tree_from_root, resolve_user, open_from_path},
         stream::{stream_directory_contents, StreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
-        caches::{HomeCache, SharedHomeCache},
+        caches::SharedHomeCache,
         cmd::resolve_path_command,
     },
 };
@@ -26,7 +26,7 @@ use crate::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(SharedHomeCache::new(HomeCache::default()))
+        .manage(SharedHomeCache::default())
         .manage(Arc::new(StreamState::default()))
         .manage(Arc::new(
             ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
@@ -37,9 +37,9 @@ pub fn run() {
             upload_audio_file,
             upload_document_file,
             // filesys
-            register_recent_access,
             get_tree_from_root,
             resolve_user,
+            open_from_path,
             // stream
             stream_directory_contents,
             // util

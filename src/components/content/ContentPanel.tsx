@@ -2,7 +2,6 @@ import { createSignal, createEffect, onCleanup, For, Show, Accessor, Setter } fr
 import { Portal } from "solid-js/web";
 import type { TabEntry } from "../../App";
 import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
-import { openPath } from "@tauri-apps/plugin-opener";
 import {
     FaSolidFile,
     FaSolidFileWord,
@@ -18,6 +17,7 @@ import {
 } from "solid-icons/fa";
 import Tab from "../../classes/Tab";
 import { LazyImage } from "../LazyImage";
+import { openFromPath } from "../../scripts/navigation";
 
 export default function ContentPanel(props: {
     currentTab: TabEntry | null;
@@ -215,7 +215,7 @@ export default function ContentPanel(props: {
     const handleDoubleClick = (file: FileChunk) => {
         if (!props.currentTab) return;
         if (file.is_dir) handleNavigate(file.path);
-        else openPath(file.path).catch((err) => setError(err));
+        else openFromPath(file.path).catch((err) => setError(err));
     };
 
     return (
