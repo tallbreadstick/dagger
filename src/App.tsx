@@ -33,6 +33,11 @@ export default function App() {
     const minWidth = 180;
     const maxWidth = 450;
 
+    const [selectedItems, setSelectedItems] = createSignal<Set<string>>(new Set());
+    const [lastClickedIndex, setLastClickedIndex] = createSignal<number | null>(null);
+    const [isDragging, setIsDragging] = createSignal(false);
+    const [justDragged, setJustDragged] = createSignal(false);
+
     // dragging state
     let sidebarRef: HTMLDivElement | undefined;
     let isResizing = false;
@@ -59,6 +64,26 @@ export default function App() {
         onCleanup(() => {
             window.removeEventListener("mousemove", handleResize);
             window.removeEventListener("mouseup", stopResize);
+        });
+    });
+
+    onMount(() => {
+        const handleGlobalMouseDown = (e: MouseEvent) => {
+            // Ignore synthetic click immediately after a drag
+            if (justDragged()) return;
+
+            const target = e.target as HTMLElement;
+            // If the mousedown is NOT on a selectable item, clear selection
+            if (!target.closest(".selectable-item")) {
+                setSelectedItems(new Set<string>());
+                setLastClickedIndex(null);
+            }
+        };
+
+        window.addEventListener("mousedown", handleGlobalMouseDown);
+
+        onCleanup(() => {
+            window.removeEventListener("mousedown", handleGlobalMouseDown);
         });
     });
 
@@ -219,6 +244,14 @@ export default function App() {
                                     showExtensions={showExtensions}
                                     refresh={refresh}
                                     setRefresh={setRefresh}
+                                    selectedItems={selectedItems}
+                                    setSelectedItems={setSelectedItems}
+                                    lastClickedIndex={lastClickedIndex}
+                                    setLastClickedIndex={setLastClickedIndex}
+                                    isDragging={isDragging}
+                                    setIsDragging={setIsDragging}
+                                    justDragged={justDragged}
+                                    setJustDragged={setJustDragged}
                                 />
                             </div>
                         </div>

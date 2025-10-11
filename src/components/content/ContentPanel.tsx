@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, For, Show, Accessor, Setter } from "solid-js";
+import { createSignal, createEffect, onCleanup, Show, Accessor, Setter } from "solid-js";
 import { Portal } from "solid-js/web";
 import type { TabEntry } from "../../App";
 import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
@@ -17,6 +17,8 @@ import {
 } from "solid-icons/fa";
 import { LazyImage } from "../LazyImage";
 import { openFromPath } from "../../scripts/navigation";
+import HomeLayout from "./HomeLayout";
+import StandardLayout from "./StandardLayout";
 
 export default function ContentPanel(props: {
     currentTab: TabEntry | null;
@@ -28,8 +30,18 @@ export default function ContentPanel(props: {
     showExtensions: Accessor<boolean>;
     refresh?: Accessor<number>;
     setRefresh?: Setter<number>;
+    selectedItems: Accessor<Set<string>>;
+    setSelectedItems: Setter<Set<string>>;
+    lastClickedIndex: Accessor<number | null>;
+    setLastClickedIndex: Setter<number | null>;
+    isDragging: Accessor<boolean>;
+    setIsDragging: Setter<boolean>;
+    justDragged: Accessor<boolean>;
+    setJustDragged: Setter<boolean>;
 }) {
-    
+
+    let panelEl: HTMLDivElement;
+
     const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
     const [loading, setLoading] = createSignal(false);
@@ -202,123 +214,155 @@ export default function ContentPanel(props: {
         else openFromPath(file.path).catch(err => setError(err));
     };
 
-    // 🏠 Special HOME layout
-    const renderHomeLayout = () => {
-        const dirs = files().filter(f => !f.pinned && f.is_dir);
-        const pinned = files().filter(f => f.pinned);
-        const recents = files().filter(f => !f.pinned && !f.is_dir);
+    // --------------------------------------
+    // SELECTION + DRAG HANDLERS (FIXED)
+    // --------------------------------------
 
-        return (
-            <div class="flex flex-col h-full w-full p-3 overflow-auto gap-4 custom-scrollbar">
-                {/* TOP: Recent Dirs Grid */}
-                <Show when={dirs.length}>
-                    <div>
-                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Recent Directories</h2>
-                        <div class="grid gap-3 grid-cols-6">
-                            <For each={dirs}>
-                                {(f) => (
-                                    <div
-                                        onDblClick={() => handleDoubleClick(f)}
-                                        class="flex flex-col items-center p-2 bg-white/80 rounded shadow hover:bg-blue-50 cursor-pointer"
-                                    >
-                                        {getFileIcon(f)}
-                                        <div class="truncate text-xs mt-1 w-full text-center">{f.name}</div>
-                                    </div>
-                                )}
-                            </For>
-                        </div>
-                    </div>
-                </Show>
+    const dragSelection = new Set<string>();
+    let dragStartedOnItem = false;
+    let dragActive = false;
+    let dragClearApplied = false;
+    const DRAG_THRESHOLD = 4;
 
-                {/* MIDDLE: Pinned Items */}
-                <Show when={pinned.length}>
-                    <div>
-                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Pinned</h2>
-                        <div class="flex flex-col gap-1">
-                            <For each={pinned}>
-                                {(f) => (
-                                    <div
-                                        onDblClick={() => handleDoubleClick(f)}
-                                        class="flex flex-row items-center p-2 bg-white/70 rounded hover:bg-blue-50 cursor-pointer"
-                                    >
-                                        {getFileIcon(f)}
-                                        <div class="flex-1 ml-2 text-xs truncate">{f.name}</div>
-                                    </div>
-                                )}
-                            </For>
-                        </div>
-                    </div>
-                </Show>
+    const [dragStart, setDragStart] = createSignal({ x: 0, y: 0 });
+    const [dragEnd, setDragEnd] = createSignal({ x: 0, y: 0 });
 
-                {/* BOTTOM: Recent Files */}
-                <Show when={recents.length}>
-                    <div>
-                        <h2 class="font-semibold text-sm text-gray-700 mb-2">Recent Files</h2>
-                        <div class="flex flex-col gap-1">
-                            <For each={recents}>
-                                {(f) => (
-                                    <div
-                                        onDblClick={() => handleDoubleClick(f)}
-                                        class="flex flex-row items-center p-2 bg-white/60 rounded hover:bg-blue-50 cursor-pointer"
-                                    >
-                                        {getFileIcon(f)}
-                                        <div class="flex-1 ml-2 text-xs truncate">{f.name}</div>
-                                        <div class="text-gray-500 text-xs">{formatDate(f.date_modified)}</div>
-                                    </div>
-                                )}
-                            </For>
-                        </div>
-                    </div>
-                </Show>
-            </div>
-        );
-    };
+    function updateSelection(newSet: Set<string>) {
+        // Force Solid reactivity
+        props.setSelectedItems(new Set(newSet));
+    }
 
-    // 🧱 Default layout
-    const renderNormalLayout = () => (
-        <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
-            <Show when={!loading()}>
-                <div
-                    class={`${props.viewMode() === 'grid' ? 'grid gap-3 justify-items-center' : 'flex flex-col gap-1'}`}
-                    style={props.viewMode() === 'grid' ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));' : undefined}
-                >
-                    <For each={files()}>
-                        {(file) => (
-                            <div
-                                onDblClick={() => handleDoubleClick(file)}
-                                class={`flex ${props.viewMode() === 'grid'
-                                    ? 'flex-col items-center p-2 bg-white/80'
-                                    : 'flex-row items-center p-1 bg-white/40'
-                                    } rounded shadow hover:bg-blue-50 cursor-pointer w-full`}
-                                title={file.name}
-                            >
-                                {getFileIcon(file)}
-                                {props.viewMode() === 'grid' ? (
-                                    <div class="text-center mt-1 w-full">
-                                        <div class="truncate text-xs">{file.name}</div>
-                                    </div>
-                                ) : (
-                                    <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
-                                        <div class="flex-1 truncate">{file.name}</div>
-                                        <div class="w-28 text-right ml-4">{file.is_dir ? 'Folder' : file.name.split('.').pop()?.toUpperCase() ?? ''}</div>
-                                        <div class="w-24 text-right ml-6">
-                                            {!file.is_dir && file.size != null
-                                                ? `${(file.size / 1024).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KB`
-                                                : '-'}
-                                        </div>
-                                        <div class="w-40 text-right ml-6">{formatDate(file.date_modified)}</div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </For>
-                </div>
-            </Show>
-        </div>
-    );
+    function handleItemClick(file: FileChunk, index: number, e: MouseEvent) {
+        if (props.justDragged()) {
+            props.setJustDragged(false);
+            return;
+        }
+
+        const ctrl = e.ctrlKey || e.metaKey;
+        const shift = e.shiftKey;
+        const current = props.selectedItems();
+        const next = new Set(current);
+
+        if (shift && props.lastClickedIndex() !== null) {
+            const start = Math.min(props.lastClickedIndex()!, index);
+            const end = Math.max(props.lastClickedIndex()!, index);
+            const range = files().slice(start, end + 1);
+            range.forEach(f => next.add(f.path));
+        } else if (ctrl) {
+            if (e.type === 'mouseup') return;
+            if (next.has(file.path)) next.delete(file.path);
+            else next.add(file.path);
+        } else {
+            next.clear();
+            next.add(file.path);
+        }
+
+        props.setLastClickedIndex(index);
+        updateSelection(next);
+    }
+
+    function handleMouseDown(e: MouseEvent) {
+        if (e.button !== 0) return;
+        setDragStart({ x: e.clientX, y: e.clientY });
+        setDragEnd({ x: e.clientX, y: e.clientY });
+
+        props.setIsDragging(true);
+        props.setJustDragged(false);
+        dragSelection.clear();
+        dragClearApplied = false;
+        dragStartedOnItem = !!(e.target as HTMLElement)?.closest(".selectable-item");
+        dragActive = false;
+
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (!ctrl && !dragStartedOnItem) {
+            updateSelection(new Set());
+            props.setLastClickedIndex(null);
+        }
+    }
+
+    function handleMouseMove(e: MouseEvent) {
+        if (!props.isDragging()) return;
+
+        const start = dragStart();
+        const dx = e.clientX - start.x;
+        const dy = e.clientY - start.y;
+
+        if (!dragActive && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+            dragActive = true;
+            props.setJustDragged(true);
+        }
+        if (!dragActive) return;
+
+        setDragEnd({ x: e.clientX, y: e.clientY });
+
+        const rect = {
+            left: Math.min(start.x, e.clientX),
+            right: Math.max(start.x, e.clientX),
+            top: Math.min(start.y, e.clientY),
+            bottom: Math.max(start.y, e.clientY),
+        };
+
+        dragSelection.clear();
+        document.querySelectorAll(".selectable-item").forEach(el => {
+            const r = el.getBoundingClientRect();
+            const intersects =
+                r.left < rect.right &&
+                r.right > rect.left &&
+                r.top < rect.bottom &&
+                r.bottom > rect.top;
+            if (intersects) {
+                const path = el.getAttribute("data-path");
+                if (path) dragSelection.add(path);
+            }
+        });
+
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (!dragClearApplied && !ctrl) {
+            updateSelection(new Set());
+            dragClearApplied = true;
+        }
+
+        const base = ctrl ? new Set(props.selectedItems()) : new Set<string>();
+        dragSelection.forEach(p => base.add(p));
+        updateSelection(base);
+    }
+
+    function handleMouseUp(e: MouseEvent) {
+        if (!props.isDragging()) return;
+        props.setIsDragging(false);
+
+        if (dragActive) {
+            props.setJustDragged(true);
+            setTimeout(() => props.setJustDragged(false), 40);
+        } else {
+            handleItemClickUnderMouse(e);
+        }
+
+        dragSelection.clear();
+        dragClearApplied = false;
+        dragStartedOnItem = false;
+        dragActive = false;
+    }
+
+    function handleItemClickUnderMouse(e: MouseEvent) {
+        const el = (e.target as HTMLElement)?.closest(".selectable-item");
+        if (!el) return;
+        const path = el.getAttribute("data-path");
+        if (!path) return;
+        const idx = files().findIndex(f => f.path === path);
+        if (idx === -1) return;
+        handleItemClick(files()[idx], idx, e);
+    }
+
+    function startDragOrSelect(file: FileChunk, index: number, e: MouseEvent) {
+        if (e.button !== 0) return;
+        handleItemClick(file, index, e);
+    }
 
     return (
-        <div class="flex-1 flex flex-col h-full overflow-hidden">
+        <div
+            ref={(el) => (panelEl = el)}
+            class="relative flex-1 flex flex-col h-full overflow-hidden">
             <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
                 <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
                     <div
@@ -328,9 +372,76 @@ export default function ContentPanel(props: {
                 </div>
             </Show>
 
-            <Show when={isHomePath()} fallback={renderNormalLayout()}>
-                {renderHomeLayout()}
+            <div
+                class="flex flex-grow flex-col overflow-hidden"
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}>
+                <Show
+                    when={isHomePath()}
+                    fallback={
+                        <StandardLayout
+                            files={files}
+                            loading={loading}
+                            viewMode={props.viewMode}
+                            handleDoubleClick={handleDoubleClick}
+                            getFileIcon={getFileIcon}
+                            formatDate={formatDate}
+                            selectedItems={props.selectedItems}
+                            startDragOrSelect={startDragOrSelect}
+                        />
+                    }>
+                    <HomeLayout
+                        files={files}
+                        handleDoubleClick={handleDoubleClick}
+                        getFileIcon={getFileIcon}
+                        formatDate={formatDate}
+                        selectedItems={props.selectedItems}
+                        startDragOrSelect={startDragOrSelect}
+                    />
+                </Show>
+            </div>
+
+            <div class="p-2 text-xs text-gray-700 flex justify-between">
+                <span>
+                    {props.selectedItems().size} item
+                    {props.selectedItems().size === 1 ? "" : "s"} selected
+                    {" / "}
+                    {files().length} total
+                </span>
+                <span>
+                    {(() => {
+                        let total = 0;
+                        for (const f of files()) {
+                            if (props.selectedItems().has(f.path)) total += f.size ?? 0;
+                        }
+
+                        // format bytes nicely
+                        const units = ["B", "KB", "MB", "GB", "TB"];
+                        let i = 0;
+                        while (total >= 1024 && i < units.length - 1) {
+                            total /= 1024;
+                            i++;
+                        }
+                        return `${total.toFixed(2)} ${units[i]}`;
+                    })()}
+                </span>
+            </div>
+
+            <Show when={props.isDragging()}>
+                <Portal>
+                    <div
+                        class="fixed pointer-events-none z-50 border border-blue-400/70 bg-blue-200/30 rounded-sm"
+                        style={{
+                            left: `${Math.min(dragStart().x, dragEnd().x)}px`,
+                            top: `${Math.min(dragStart().y, dragEnd().y)}px`,
+                            width: `${Math.abs(dragEnd().x - dragStart().x)}px`,
+                            height: `${Math.abs(dragEnd().y - dragStart().y)}px`,
+                        }}
+                    />
+                </Portal>
             </Show>
+
 
             <Show when={error()}>
                 <Portal>
