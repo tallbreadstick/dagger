@@ -85,3 +85,18 @@ export async function streamDirectoryContents(
         unlistenComplete();
     };
 }
+
+/**
+ * Check if a given path is a directory.
+ * @param path Absolute or relative file system path
+ * @returns Promise resolving to true if directory, false otherwise
+ */
+export async function isDirectory(path: string): Promise<boolean> {
+    try {
+        const result = await invoke<boolean>('is_directory', { path });
+        return result;
+    } catch (err) {
+        console.error('isDirectory failed:', err);
+        return false;
+    }
+}

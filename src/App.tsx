@@ -17,6 +17,8 @@ import { createStore, SetStoreFunction } from "solid-js/store";
 import Tab from "./classes/Tab";
 import ActionBar from "./components/content/ActionBar";
 import ContentPanel from "./components/content/ContentPanel";
+import { openFromPath } from "./scripts/navigation";
+import { isDirectory } from "./scripts/stream";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -165,6 +167,35 @@ export default function App() {
             setSearchMode(true);
             queueMicrotask(() => focusSearchInput?.());
         },
+        openSelectedItem: async () => {
+            const selected = Array.from(selectedItems());
+            if (selected.length !== 1) return;
+
+            const filePath = selected[0];
+            const entry = currentTab();
+            if (!entry) return;
+
+            try {
+                const isDir = await isDirectory(filePath);
+
+                if (isDir) {
+                    // Use clone + setTab instead of mutating directly
+                    const newTab = entry.tab.clone();
+                    newTab.navigateTo(filePath);
+                    entry.setTab(newTab);
+
+                    setRefresh(r => r + 1);
+                    setSelectedItems(new Set<string>());
+                    setLastClickedIndex(null);
+                    return;
+                }
+
+                // Otherwise, open as a file
+                await openFromPath(filePath);
+            } catch (err) {
+                console.error("Failed to open selected item:", err);
+            }
+        }
     });
 
     return (

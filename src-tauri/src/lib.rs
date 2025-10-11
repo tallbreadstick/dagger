@@ -8,7 +8,7 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{get_tree_from_root, open_from_path, list_directory_contents, resolve_user},
+        nav::{get_tree_from_root, open_from_path, list_directory_contents, resolve_user, is_directory},
         stream::{stream_directory_contents, StreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
@@ -33,6 +33,7 @@ pub fn run() {
             resolve_user,
             open_from_path,
             list_directory_contents,
+            is_directory,
             // stream
             stream_directory_contents,
             // util

@@ -4,6 +4,7 @@ import { onCleanup } from "solid-js";
 export type ShortcutActions = {
     toggleSearchMode: () => void;
     setSearchMode: (mode: "text" | "image" | "audio" | "document") => void;
+    openSelectedItem: () => void;
 };
 
 // Global keyboard listener
@@ -30,6 +31,13 @@ export function useGlobalShortcuts(actions: ShortcutActions) {
                 case "4":
                     e.preventDefault();
                     actions.setSearchMode("document");
+                    break;
+            }
+        } else {
+            switch (e.key.toLocaleLowerCase()) {
+                case "enter":
+                    e.preventDefault();
+                    actions.openSelectedItem();
                     break;
             }
         }

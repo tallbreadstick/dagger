@@ -346,3 +346,17 @@ pub fn resolve_user(handle: AppHandle) -> Result<String, String> {
         .map(|p| p.to_string_lossy().to_string())
         .map_err(|_| "Failed to resolve home directory".to_string())
 }
+
+/// Checks if the given path points to a directory.
+#[tauri::command]
+pub fn is_directory(path: &str) -> Result<bool, String> {
+    let p = Path::new(path);
+
+    // First, ensure the path exists
+    if !p.exists() {
+        return Err(format!("Path does not exist: {}", path));
+    }
+
+    // Return whether it's a directory
+    Ok(p.is_dir())
+}
