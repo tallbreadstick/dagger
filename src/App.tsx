@@ -154,6 +154,7 @@ export default function App() {
     const [viewMode, setViewMode] = createSignal<'grid' | 'list'>('grid');
     const [showHidden, setShowHidden] = createSignal(false);
     const [showExtensions, setShowExtensions] = createSignal(true);
+    const [iconSize, setIconSize] = createSignal<'small' | 'medium'>('small');
 
     let focusSearchInput: (() => void) | null = null;
 
@@ -261,6 +262,8 @@ export default function App() {
                                 setShowHidden={setShowHidden}
                                 showExtensions={showExtensions()}
                                 setShowExtensions={setShowExtensions}
+                                iconSize={iconSize()}
+                                setIconSize={setIconSize}
                             />
                             {/* ContentPanel below */}
                             <div class="flex-1 overflow-auto">
@@ -273,6 +276,7 @@ export default function App() {
                                     viewMode={viewMode}
                                     showHidden={showHidden}
                                     showExtensions={showExtensions}
+                                    iconSize={iconSize}
                                     refresh={refresh}
                                     setRefresh={setRefresh}
                                     selectedItems={selectedItems}

@@ -28,6 +28,7 @@ export default function ContentPanel(props: {
     viewMode: Accessor<'grid' | 'list'>;
     showHidden: Accessor<boolean>;
     showExtensions: Accessor<boolean>;
+    iconSize: Accessor<'small' | 'medium'>;
     refresh?: Accessor<number>;
     setRefresh?: Setter<number>;
     selectedItems: Accessor<Set<string>>;
@@ -40,7 +41,7 @@ export default function ContentPanel(props: {
     setJustDragged: Setter<boolean>;
 }) {
 
-    let panelEl: HTMLDivElement;
+    let _panelEl: HTMLDivElement;
 
     const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
@@ -142,7 +143,16 @@ export default function ContentPanel(props: {
     });
 
     function getIconSize() {
-        return props.viewMode() === 'grid' ? 'w-12 h-12' : 'w-5 h-5';
+        if (isHomePath()) return 'w-12 h-12';
+        if (props.viewMode() === 'list') return 'w-5 h-5';
+        switch (props.iconSize()) {
+            case 'small':
+                return props.viewMode() === 'grid'
+                ? 'w-8 h-8'
+                : 'w-5 h-5';
+            case 'medium':
+                return 'w-12 h-12';
+        }
     }
 
     function getFileIcon(file: FileChunk) {
@@ -176,7 +186,7 @@ export default function ContentPanel(props: {
                     />
                     {isVideo && (
                         <div class="absolute inset-0 flex items-center justify-center">
-                            <FaSolidPlay class={`text-white opacity-80 ${props.viewMode() === 'grid' ? 'w-6 h-6' : 'w-3 h-3'}`} />
+                            <FaSolidPlay class={`text-white opacity-80 ${props.iconSize() === 'medium' || isHomePath() ? 'w-6 h-6' : 'w-3 h-3'}`} />
                         </div>
                     )}
                 </div>
@@ -361,7 +371,7 @@ export default function ContentPanel(props: {
 
     return (
         <div
-            ref={(el) => (panelEl = el)}
+            ref={(el) => (_panelEl = el)}
             class="relative flex-1 flex flex-col h-full overflow-hidden">
             <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
                 <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
@@ -384,6 +394,7 @@ export default function ContentPanel(props: {
                             files={files}
                             loading={loading}
                             viewMode={props.viewMode}
+                            iconSize={props.iconSize}
                             handleDoubleClick={handleDoubleClick}
                             getFileIcon={getFileIcon}
                             formatDate={formatDate}

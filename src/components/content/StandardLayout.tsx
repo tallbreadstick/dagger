@@ -5,6 +5,7 @@ type StandardLayoutProps = {
     files: Accessor<FileChunk[]>;
     loading: Accessor<boolean>;
     viewMode: Accessor<'grid' | 'list'>;
+    iconSize: Accessor<'small' | 'medium'>;
     handleDoubleClick: (file: FileChunk) => void;
     getFileIcon: (file: FileChunk) => JSX.Element;
     formatDate: (date: number | undefined) => string;
@@ -16,19 +17,29 @@ const StandardLayout: Component<StandardLayoutProps> = ({
     files,
     loading,
     viewMode,
+    iconSize,
     handleDoubleClick,
     getFileIcon,
     formatDate,
     selectedItems,
     startDragOrSelect,
 }) => {
+
+    function itemWidth() {
+        switch (iconSize()) {
+            case 'small':
+                return '90px';
+            case 'medium':
+                return '120px';
+        }
+    }
     
     return (
         <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
             <Show when={!loading()}>
                 <div
                     class={`${viewMode() === 'grid' ? 'grid gap-3 justify-items-center' : 'flex flex-col gap-1'}`}
-                    style={viewMode() === 'grid' ? 'grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));' : undefined}
+                    style={viewMode() === 'grid' ? `grid-template-columns: repeat(auto-fill, minmax(${itemWidth()}, 1fr));` : undefined}
                 >
                     <For each={files()}>
                         {(file, index) => (
