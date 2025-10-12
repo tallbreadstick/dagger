@@ -19,6 +19,7 @@ import ActionBar from "./components/content/ActionBar";
 import ContentPanel from "./components/content/ContentPanel";
 import { openFromPath } from "./scripts/navigation";
 import { isDirectory } from "./scripts/stream";
+import { useLayoutCache } from "./scripts/layout";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -146,15 +147,14 @@ export default function App() {
         "text" | "image" | "audio" | "document"
     >("text");
 
-    // Sorting
-    const [sortKey, setSortKey] = createSignal<'name' | 'size' | 'filetype' | 'date_modified'>('name');
-    const [ascending, setAscending] = createSignal(true);
-
-    // Viewing
-    const [viewMode, setViewMode] = createSignal<'grid' | 'list'>('grid');
-    const [showHidden, setShowHidden] = createSignal(false);
-    const [showExtensions, setShowExtensions] = createSignal(true);
-    const [iconSize, setIconSize] = createSignal<'small' | 'medium'>('small');
+    const {
+        sortKey, setSortKey,
+        ascending, setAscending,
+        viewMode, setViewMode,
+        showHidden, setShowHidden,
+        showExtensions, setShowExtensions,
+        iconSize, setIconSize
+    } = useLayoutCache();
 
     let focusSearchInput: (() => void) | null = null;
 
@@ -250,7 +250,7 @@ export default function App() {
                         </div>
 
                         {/* Main content area */}
-                        <div class="flex-1 min-w-0 overflow-auto flex flex-col">
+                        <div class="flex-1 min-w-0 overflow-auto flex flex-col custom-scrollbar">
                             <ActionBar
                                 sortKey={sortKey()}
                                 setSortKey={setSortKey}

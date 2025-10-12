@@ -2,10 +2,15 @@ use std::{fs, path::PathBuf};
 use tauri::{AppHandle, Manager};
 
 pub mod home;
+pub mod layouts;
 pub mod thumbs;
 
 pub use home::{load_home_cache, save_home_cache, HomeCache, SharedHomeCache};
-pub use thumbs::{open_thumb_db, hash_path, get_thumb, set_thumb, prune_thumbs};
+pub use layouts::{
+    fetch_layout_settings, load_layout_cache, save_layout_cache, update_layout_settings,
+    LayoutCache, SharedLayoutCache,
+};
+pub use thumbs::{get_thumb, hash_path, open_thumb_db, prune_thumbs, set_thumb};
 
 /// Location of the app cache directory
 fn get_cache_dir(handle: &AppHandle) -> PathBuf {

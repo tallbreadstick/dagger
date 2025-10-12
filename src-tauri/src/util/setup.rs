@@ -1,7 +1,7 @@
 use tauri::{App, Emitter, Manager, Result, WindowEvent};
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
-use crate::util::caches::{load_home_cache, SharedHomeCache};
+use crate::util::caches::{load_home_cache, load_layout_cache, SharedHomeCache, SharedLayoutCache};
 
 pub fn setup_app_environment(app: &mut App) -> Result<()> {
     // 🪟 Setup the acrylic window effect
@@ -9,6 +9,8 @@ pub fn setup_app_environment(app: &mut App) -> Result<()> {
     setup_window_acrylic(app)?;
     // 🏠 Initialize home cache
     manage_home_cache(app)?;
+    // Initialize layout cache
+    manage_layout_cache(app)?;
     Ok(())
 }
 
@@ -40,5 +42,12 @@ fn manage_home_cache(app: &mut App) -> Result<()> {
     let handle = app.handle();
     let cache = load_home_cache(&handle);
     app.manage(SharedHomeCache::new(cache));
+    Ok(())
+}
+
+fn manage_layout_cache(app: &mut App) -> Result<()> {
+    let handle = app.handle();
+    let cache = load_layout_cache(&handle);
+    app.manage(SharedLayoutCache::new(cache));
     Ok(())
 }

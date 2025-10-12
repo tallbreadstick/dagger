@@ -56,6 +56,7 @@ body.unfocused::before {
 /* Custom Scrollbar — Glassy Theme */
 .custom-scrollbar::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -73,5 +74,5 @@ body.unfocused::before {
 }
 
 .sidebar {
-  transition: width 0.15s ease-out;
+  transition: width 0.15s ease-out, height 0.15s ease-out;
 }
