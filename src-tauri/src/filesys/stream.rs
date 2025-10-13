@@ -14,12 +14,12 @@ use std::{
 };
 use tauri::{AppHandle, Emitter, State};
 
-pub struct StreamState {
+pub struct FileStreamState {
     pub current_id: AtomicU64,
     pub cancelled: AtomicBool,
 }
 
-impl Default for StreamState {
+impl Default for FileStreamState {
     fn default() -> Self {
         Self {
             current_id: AtomicU64::new(0),
@@ -31,7 +31,7 @@ impl Default for StreamState {
 #[tauri::command]
 pub async fn stream_directory_contents(
     handle: AppHandle,
-    state: State<'_, Arc<StreamState>>,
+    state: State<'_, Arc<FileStreamState>>,
     pool: State<'_, Arc<rayon::ThreadPool>>,
     cache_state: State<'_, SharedHomeCache>,
     mut path: String,

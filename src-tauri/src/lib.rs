@@ -11,7 +11,7 @@ use crate::{
         nav::{
             get_tree_from_root, is_directory, list_directory_contents, open_from_path, resolve_user,
         },
-        stream::{stream_directory_contents, StreamState},
+        stream::{stream_directory_contents, FileStreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
@@ -25,7 +25,7 @@ use crate::{
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(Arc::new(StreamState::default()))
+        .manage(Arc::new(FileStreamState::default()))
         .manage(Arc::new(
             ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
         ))

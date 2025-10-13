@@ -4,12 +4,13 @@ use window_vibrancy::{apply_acrylic, clear_acrylic};
 use crate::util::caches::{load_home_cache, load_layout_cache, SharedHomeCache, SharedLayoutCache};
 
 pub fn setup_app_environment(app: &mut App) -> Result<()> {
-    // 🪟 Setup the acrylic window effect
     #[cfg(target_os = "windows")]
     setup_window_acrylic(app)?;
-    // 🏠 Initialize home cache
+
+    #[cfg(not(target_os = "windows"))]
+    setup_window_transparency(app)?;
+
     manage_home_cache(app)?;
-    // Initialize layout cache
     manage_layout_cache(app)?;
     Ok(())
 }
@@ -18,7 +19,6 @@ pub fn setup_app_environment(app: &mut App) -> Result<()> {
 fn setup_window_acrylic(app: &mut App) -> Result<()> {
     let window = app.get_webview_window("main").unwrap();
 
-    // Apply acrylic initially
     apply_acrylic(&window, Some((0, 0, 0, 20))).unwrap();
 
     let win_clone = window.clone();
@@ -34,6 +34,20 @@ fn setup_window_acrylic(app: &mut App) -> Result<()> {
         }
         _ => {}
     });
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn setup_window_transparency(app: &mut App) -> Result<()> {
+    let window = app.get_webview_window("main").unwrap();
+
+    // Set the background opacity to 0 for transparency
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        // Wry’s set_background_color or Tauri’s opacity setter
+        window.set_background_color((0.0, 0.0, 0.0, 0.0)).ok();
+    }
 
     Ok(())
 }
