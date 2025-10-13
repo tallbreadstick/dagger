@@ -41,14 +41,9 @@ fn setup_window_acrylic(app: &mut App) -> Result<()> {
 #[cfg(not(target_os = "windows"))]
 fn setup_window_transparency(app: &mut App) -> Result<()> {
     let window = app.get_webview_window("main").unwrap();
-
     // Set the background opacity to 0 for transparency
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
-    {
-        // Wry’s set_background_color or Tauri’s opacity setter
-        window.set_background_color((0.0, 0.0, 0.0, 0.0)).ok();
-    }
-
+    let opaque = tauri::webview::Color(0, 0, 0, 0);
+    window.set_background_color(Some(opaque)).ok();
     Ok(())
 }
 
