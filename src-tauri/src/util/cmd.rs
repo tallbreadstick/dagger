@@ -1,6 +1,10 @@
 use serde::Serialize;
+use std::{
+    collections::HashMap,
+    env::{self, VarError},
+    path::PathBuf,
+};
 use tauri::{AppHandle, Manager};
-use std::{collections::HashMap, env::{self, VarError}, path::PathBuf};
 
 #[derive(Serialize)]
 pub struct ResolveResult {
@@ -134,27 +138,24 @@ pub fn resolve_quick_access(handle: AppHandle) -> Result<HashMap<String, String>
 
     #[cfg(target_os = "linux")]
     {
-        // Try to respect XDG user dirs
-        let xdg = dirs_next::user_dirs()
-            .map(|d| d)
-            .ok_or("Failed to get user directories")?;
+        use dirs_next;
 
-        if let Some(docs) = xdg.document_dir() {
+        if let Some(docs) = dirs_next::document_dir() {
             map.insert("Documents".to_string(), docs.to_string_lossy().to_string());
         }
-        if let Some(dl) = xdg.download_dir() {
+        if let Some(dl) = dirs_next::download_dir() {
             map.insert("Downloads".to_string(), dl.to_string_lossy().to_string());
         }
-        if let Some(desktop) = xdg.desktop_dir() {
+        if let Some(desktop) = dirs_next::desktop_dir() {
             map.insert("Desktop".to_string(), desktop.to_string_lossy().to_string());
         }
-        if let Some(pics) = xdg.picture_dir() {
+        if let Some(pics) = dirs_next::picture_dir() {
             map.insert("Pictures".to_string(), pics.to_string_lossy().to_string());
         }
-        if let Some(music) = xdg.audio_dir() {
+        if let Some(music) = dirs_next::audio_dir() {
             map.insert("Music".to_string(), music.to_string_lossy().to_string());
         }
-        if let Some(videos) = xdg.video_dir() {
+        if let Some(videos) = dirs_next::video_dir() {
             map.insert("Videos".to_string(), videos.to_string_lossy().to_string());
         }
     }

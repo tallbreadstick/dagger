@@ -42,7 +42,7 @@ fn setup_window_acrylic(app: &mut App) -> Result<()> {
 fn setup_window_transparency(app: &mut App) -> Result<()> {
     let window = app.get_webview_window("main").unwrap();
     // Set the background opacity to 0 for transparency
-    let opaque = tauri::webview::Color(0, 0, 0, 0);
+    let opaque = tauri::webview::Color(255, 255, 255, 255);
     window.set_background_color(Some(opaque)).ok();
     Ok(())
 }
