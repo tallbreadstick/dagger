@@ -36,4 +36,5 @@ rusqlite = { version = "0.37.0", features = ["bundled"] }
 xxhash-rust = { version = "0.8.15", features = ["xxh3"] }
 dunce = "1.0.5"
 opener = "0.8.3"
+dirs-next = "2.0.0"
 
