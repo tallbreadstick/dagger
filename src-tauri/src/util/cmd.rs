@@ -123,7 +123,7 @@ pub fn resolve_quick_access(handle: AppHandle) -> Result<HashMap<String, String>
     let mut map = HashMap::new();
 
     // 🏠 Home (always present)
-    map.insert("Home".to_string(), home.to_string_lossy().to_string());
+    map.insert("Home".to_string(), "Home".to_string());
 
     #[cfg(target_os = "windows")]
     {

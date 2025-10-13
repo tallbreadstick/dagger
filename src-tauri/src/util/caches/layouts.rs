@@ -43,7 +43,7 @@ pub enum ViewMode {
 pub enum IconSize {
     Small,
     Medium,
-    // Add Large later if needed
+    Large
 }
 
 impl Default for LayoutCache {

@@ -13,7 +13,8 @@ import {
     FaSolidFileCode,
     FaSolidFilePowerpoint,
     FaSolidFolder,
-    FaSolidPlay
+    FaSolidPlay,
+    FaSolidArrowTurnUp
 } from "solid-icons/fa";
 import { LazyImage } from "../LazyImage";
 import { openFromPath } from "../../scripts/navigation";
@@ -28,7 +29,7 @@ export default function ContentPanel(props: {
     viewMode: Accessor<'grid' | 'list'>;
     showHidden: Accessor<boolean>;
     showExtensions: Accessor<boolean>;
-    iconSize: Accessor<'small' | 'medium'>;
+    iconSize: Accessor<'small' | 'medium' | 'large'>;
     refresh?: Accessor<number>;
     setRefresh?: Setter<number>;
     selectedItems: Accessor<Set<string>>;
@@ -147,11 +148,11 @@ export default function ContentPanel(props: {
         if (props.viewMode() === 'list') return 'w-5 h-5';
         switch (props.iconSize()) {
             case 'small':
-                return props.viewMode() === 'grid'
-                ? 'w-8 h-8'
-                : 'w-5 h-5';
+                return 'w-8 h-8';
             case 'medium':
                 return 'w-12 h-12';
+            case 'large':
+                return 'w-16 h-16';
         }
     }
 
@@ -175,8 +176,10 @@ export default function ContentPanel(props: {
 
         const isVideo = videoExts.includes(ext);
         const isImage = imageExts.includes(ext);
+        const isShortcut = ext === "lnk";
 
-        if ((isImage || isVideo) && file.thumbnail) {
+        // --- 1️⃣ Thumbnail handling ---
+        if ((isImage || isVideo || isShortcut) && file.thumbnail) {
             return (
                 <div class="relative inline-block mb-1">
                     <LazyImage
@@ -189,11 +192,26 @@ export default function ContentPanel(props: {
                             <FaSolidPlay class={`text-white opacity-80 ${props.iconSize() === 'medium' || isHomePath() ? 'w-6 h-6' : 'w-3 h-3'}`} />
                         </div>
                     )}
+                    {isShortcut && (
+                        <div class="absolute bottom-0 right-0 p-0.5 bg-black/60 rounded-full">
+                            <FaSolidArrowTurnUp class="w-3 h-3 text-white opacity-90 rotate-45" />
+                        </div>
+                    )}
                 </div>
             );
         }
 
-        // Generic icon fallback with responsive size
+        // --- 2️⃣ Fallback icon logic ---
+        if (isShortcut)
+            return (
+                <div class="relative inline-block mb-1">
+                    <FaSolidFile class={`text-gray-400 ${iconSize}`} />
+                    <div class="absolute bottom-0 right-0 p-0.5 bg-black/60 rounded-full">
+                        <FaSolidArrowTurnUp class="w-3 h-3 text-white opacity-90 rotate-45" />
+                    </div>
+                </div>
+            );
+
         if (docExts.includes(ext)) return <FaSolidFileWord class={`text-blue-400 ${iconSize}`} />;
         if (presExts.includes(ext)) return <FaSolidFilePowerpoint class={`text-orange-400 ${iconSize}`} />;
         if (sheetExts.includes(ext)) return <FaSolidFileExcel class={`text-green-400 ${iconSize}`} />;
@@ -206,6 +224,7 @@ export default function ContentPanel(props: {
 
         return <FaSolidFile class={`text-gray-500 ${iconSize}`} />;
     }
+
 
     const formatDate = (t?: number) =>
         t ? new Date(t * 1000).toLocaleString() : "";
@@ -394,6 +413,7 @@ export default function ContentPanel(props: {
                             files={files}
                             loading={loading}
                             viewMode={props.viewMode}
+                            showExtensions={props.showExtensions}
                             iconSize={props.iconSize}
                             handleDoubleClick={handleDoubleClick}
                             getFileIcon={getFileIcon}

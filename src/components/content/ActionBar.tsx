@@ -18,6 +18,7 @@ import {
     FaSolidTableCellsLarge,
     FaSolidTableCells,
     FaSolidTableList,
+    FaSolidSquare,
 } from "solid-icons/fa";
 import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
@@ -34,8 +35,8 @@ export default function ActionBar(props: {
     setShowHidden: (v: boolean) => void;
     showExtensions: boolean;
     setShowExtensions: (v: boolean) => void;
-    iconSize: 'small' | 'medium';
-    setIconSize: (v: 'small' | 'medium') => void;
+    iconSize: 'small' | 'medium' | 'large';
+    setIconSize: (v: 'small' | 'medium' | 'large') => void;
 }) {
     const [openMenu, setOpenMenu] = createSignal<null | "new" | "sort" | "view">(null);
     const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -55,15 +56,19 @@ export default function ActionBar(props: {
     document.addEventListener("click", handleClickAway);
 
     const iconPresets = [
-        { key: 'small-grid', icon: <FaSolidTableCells />, set: () => {
+        { key: 'Small Grid', icon: <FaSolidTableCells />, set: () => {
             props.setIconSize('small');
             props.setViewMode('grid');
         } },
-        { key: 'medium-grid', icon: <FaSolidTableCellsLarge />, set: () => {
+        { key: 'Medium Grid', icon: <FaSolidTableCellsLarge />, set: () => {
             props.setIconSize('medium');
             props.setViewMode('grid');
         } },
-        { key: 'small-list', icon: <FaSolidTableList />, set: () => {
+        { key: 'Large Grid', icon: <FaSolidSquare />, set: () => {
+            props.setIconSize('large');
+            props.setViewMode('grid');
+        } },
+        { key: 'List', icon: <FaSolidTableList />, set: () => {
             props.setIconSize('small');
             props.setViewMode('list');
         } },
@@ -119,7 +124,7 @@ export default function ActionBar(props: {
                     {(opt) => (
                         <button
                             class="p-2 rounded transition hover:bg-white/50"
-                            title={`Icon size: ${opt.key}`}
+                            title={`Preset: ${opt.key}`}
                             onClick={opt.set}
                         >
                             {opt.icon}

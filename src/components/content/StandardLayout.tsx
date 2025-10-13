@@ -5,7 +5,8 @@ type StandardLayoutProps = {
     files: Accessor<FileChunk[]>;
     loading: Accessor<boolean>;
     viewMode: Accessor<'grid' | 'list'>;
-    iconSize: Accessor<'small' | 'medium'>;
+    showExtensions: Accessor<boolean>;
+    iconSize: Accessor<'small' | 'medium' | 'large'>;
     handleDoubleClick: (file: FileChunk) => void;
     getFileIcon: (file: FileChunk) => JSX.Element;
     formatDate: (date: number | undefined) => string;
@@ -17,6 +18,7 @@ const StandardLayout: Component<StandardLayoutProps> = ({
     files,
     loading,
     viewMode,
+    showExtensions,
     iconSize,
     handleDoubleClick,
     getFileIcon,
@@ -31,9 +33,11 @@ const StandardLayout: Component<StandardLayoutProps> = ({
                 return '90px';
             case 'medium':
                 return '120px';
+            case 'large':
+                return '150px';
         }
     }
-    
+
     return (
         <div class="flex flex-col h-full w-full p-2 overflow-auto scrollbar-thin scrollbar-thumb-gray-400/60 custom-scrollbar">
             <Show when={!loading()}>
@@ -60,8 +64,21 @@ const StandardLayout: Component<StandardLayoutProps> = ({
                                 {getFileIcon(file)}
                                 {viewMode() === 'grid' ? (
                                     <div class="text-center mt-1 w-full">
-                                        <div class="truncate text-xs">{file.name}</div>
+                                        <div class="truncate text-xs">
+                                            {(() => {
+                                                if (!showExtensions()) {
+                                                    if (file.is_dir) return file.name; // Don't strip folders
+                                                    const lastDot = file.name.lastIndexOf(".");
+                                                    // Only hide extension if it’s not the first char (so we don’t mess up .gitignore, etc.)
+                                                    if (lastDot > 0) {
+                                                        return file.name.slice(0, lastDot);
+                                                    }
+                                                }
+                                                return file.name;
+                                            })()}
+                                        </div>
                                     </div>
+
                                 ) : (
                                     <div class="flex flex-1 text-xs text-gray-700 min-w-0 ml-2">
                                         <div class="flex-1 truncate">{file.name}</div>

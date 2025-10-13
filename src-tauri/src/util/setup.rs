@@ -1,4 +1,4 @@
-use tauri::{App, Emitter, Manager, Result, WindowEvent};
+use tauri::{webview::Color, App, Emitter, Manager, Result, WindowEvent};
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 use crate::util::caches::{load_home_cache, load_layout_cache, SharedHomeCache, SharedLayoutCache};
@@ -27,10 +27,14 @@ fn setup_window_acrylic(app: &mut App) -> Result<()> {
         WindowEvent::Focused(true) => {
             let _ = win_clone.emit("window-focus", ());
             apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
+            win_clone.set_background_color(Some(Color(0, 0, 0, 0))).ok();
         }
         WindowEvent::Focused(false) => {
             let _ = win_clone.emit("window-blur", ());
             clear_acrylic(&win_clone).ok();
+            win_clone
+                .set_background_color(Some(Color(120, 120, 120, 255)))
+                .ok();
         }
         _ => {}
     });
@@ -42,7 +46,7 @@ fn setup_window_acrylic(app: &mut App) -> Result<()> {
 fn setup_window_transparency(app: &mut App) -> Result<()> {
     let window = app.get_webview_window("main").unwrap();
     // Set the background opacity to 0 for transparency
-    let opaque = tauri::webview::Color(255, 255, 255, 255);
+    let opaque = tauri::webview::Color(120, 120, 120, 255);
     window.set_background_color(Some(opaque)).ok();
     Ok(())
 }

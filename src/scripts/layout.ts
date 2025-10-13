@@ -5,7 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 export type SortKey = "name" | "size" | "filetype" | "date_modified";
 export type ViewMode = "grid" | "list";
-export type IconSize = "small" | "medium";
+export type IconSize = "small" | "medium" | "large";
 
 export interface LayoutCache {
     // Sorting

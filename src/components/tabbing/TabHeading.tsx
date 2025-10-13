@@ -9,13 +9,13 @@ const TabHeading: Component<{
     removeTab: (id: number) => void;
 }> = ({ currentTab, setCurrentTab, tab, removeTab }) => {
 
-    // 🔁 Reactive name: recomputes whenever tab.workingDir changes
     const name = createMemo(() => {
         // Split by either '\' or '/' to handle Windows + POSIX paths
         const tokens = tab.workingDir.split(/[\\/]/).filter(Boolean);
-        return tokens.length > 0 ? tokens[tokens.length - 1] : tab.workingDir;
+        return tokens.length > 0
+            ? tokens[tokens.length - 1]
+            : (tab.workingDir.trim() === "" ? "/" : tab.workingDir);
     });
-
 
     function selectTab() {
         setCurrentTab(tab);

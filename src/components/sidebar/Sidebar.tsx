@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show, For } from "solid-js";
-import { getDirectoryTreeFromRoot, FileNode, resolveUserHome, resolveQuickAccess } from "../../scripts/navigation";
+import { getDirectoryTreeFromRoot, FileNode, resolveQuickAccess } from "../../scripts/navigation";
 import type { TabEntry } from "../../App";
 import { TreeNode } from "./TreeNode";
 import Tab from "../../classes/Tab";
