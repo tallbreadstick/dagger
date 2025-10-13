@@ -11,9 +11,11 @@ const TabHeading: Component<{
 
     // 🔁 Reactive name: recomputes whenever tab.workingDir changes
     const name = createMemo(() => {
-        const tokens = tab.workingDir.split("\\").filter(Boolean);
+        // Split by either '\' or '/' to handle Windows + POSIX paths
+        const tokens = tab.workingDir.split(/[\\/]/).filter(Boolean);
         return tokens.length > 0 ? tokens[tokens.length - 1] : tab.workingDir;
     });
+
 
     function selectTab() {
         setCurrentTab(tab);

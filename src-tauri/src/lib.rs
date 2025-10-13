@@ -16,7 +16,7 @@ use crate::{
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
         caches::{fetch_layout_settings, update_layout_settings},
-        cmd::resolve_path_command,
+        cmd::{resolve_path_command, resolve_quick_access},
         setup::setup_app_environment,
     },
 };
@@ -44,6 +44,7 @@ pub fn run() {
             stream_directory_contents,
             // util
             resolve_path_command,
+            resolve_quick_access,
             fetch_layout_settings,
             update_layout_settings
         ])

@@ -1,4 +1,6 @@
 use serde::Serialize;
+use tauri::{AppHandle, Manager};
+use std::{collections::HashMap, env::{self, VarError}, path::PathBuf};
 
 #[derive(Serialize)]
 pub struct ResolveResult {
@@ -8,36 +10,44 @@ pub struct ResolveResult {
 
 #[tauri::command]
 pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
-    use std::env;
-    use std::path::PathBuf;
-
     let cmd = command.trim();
 
     // --- Special virtual path: Home ---
     if cmd.eq_ignore_ascii_case("home") {
         return Ok(ResolveResult {
             kind: "path".into(),
-            value: "Home".into(), // internal identifier for Home
+            value: "Home".into(),
         });
     }
 
-    // --- Handle environment variables like %APPDATA%, %LOCALAPPDATA%, etc. ---
-    if cmd.starts_with('%') && cmd.ends_with('%') {
-        let var_name = &cmd[1..cmd.len() - 1].to_ascii_uppercase();
+    // --- Handle environment variables, including paths like %APPDATA%\Dagger ---
+    if cmd.starts_with('%') {
+        if let Some(end) = cmd[1..].find('%') {
+            let var_name = &cmd[1..1 + end].to_ascii_uppercase();
+            let remaining_path = cmd[2 + end..].trim_start_matches(['\\', '/']);
 
-        let value = match var_name.as_str() {
-            "APPDATA" => env::var("APPDATA"),
-            "LOCALAPPDATA" => env::var("LOCALAPPDATA"),
-            "TEMP" | "TMP" => env::var("TEMP").or_else(|_| env::var("TMP")),
-            "USERPROFILE" => env::var("USERPROFILE"),
-            _ => return Err(format!("Unknown variable: {}", var_name)),
+            let env_value = match var_name.as_str() {
+                "APPDATA" => env::var("APPDATA"),
+                "LOCALAPPDATA" => env::var("LOCALAPPDATA"),
+                "TEMP" | "TMP" => env::var("TEMP").or_else(|_| env::var("TMP")),
+                "USERPROFILE" => env::var("USERPROFILE"),
+                _ => Err(VarError::NotPresent),
+            }
+            .map_err(|e| format!("{e}"))?; // <--- convert to String here
+
+            let full_path = if remaining_path.is_empty() {
+                env_value
+            } else {
+                format!("{}/{}", env_value, remaining_path)
+            };
+
+            let normalized = PathBuf::from(full_path);
+
+            return Ok(ResolveResult {
+                kind: "path".into(),
+                value: normalized.to_string_lossy().to_string(),
+            });
         }
-        .map_err(|_| format!("Environment variable {} not found", var_name))?;
-
-        return Ok(ResolveResult {
-            kind: "path".into(),
-            value,
-        });
     }
 
     // --- Handle built-in commands ---
@@ -56,7 +66,6 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
             #[cfg(not(target_os = "windows"))]
             return Err("cmd is only available on Windows".into());
         }
-
         "powershell" => {
             #[cfg(target_os = "windows")]
             {
@@ -71,7 +80,6 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
             #[cfg(not(target_os = "windows"))]
             return Err("powershell is only available on Windows".into());
         }
-
         "explorer" => {
             #[cfg(target_os = "windows")]
             {
@@ -86,7 +94,6 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
             #[cfg(not(target_os = "windows"))]
             return Err("explorer is only available on Windows".into());
         }
-
         _ => {}
     }
 
@@ -100,4 +107,69 @@ pub fn resolve_path_command(command: &str) -> Result<ResolveResult, String> {
     } else {
         Err(format!("Invalid path or command: {}", cmd))
     }
+}
+
+#[tauri::command]
+pub fn resolve_quick_access(handle: AppHandle) -> Result<HashMap<String, String>, String> {
+    let home = handle
+        .path()
+        .home_dir()
+        .map_err(|_| "Failed to resolve home directory")?;
+
+    let mut map = HashMap::new();
+
+    // 🏠 Home (always present)
+    map.insert("Home".to_string(), home.to_string_lossy().to_string());
+
+    #[cfg(target_os = "windows")]
+    {
+        let append = |base: &PathBuf, sub| base.join(sub).to_string_lossy().to_string();
+        map.insert("Documents".to_string(), append(&home, "Documents"));
+        map.insert("Downloads".to_string(), append(&home, "Downloads"));
+        map.insert("Desktop".to_string(), append(&home, "Desktop"));
+        map.insert("Pictures".to_string(), append(&home, "Pictures"));
+        map.insert("Music".to_string(), append(&home, "Music"));
+        map.insert("Videos".to_string(), append(&home, "Videos"));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Try to respect XDG user dirs
+        let xdg = dirs_next::user_dirs()
+            .map(|d| d)
+            .ok_or("Failed to get user directories")?;
+
+        if let Some(docs) = xdg.document_dir() {
+            map.insert("Documents".to_string(), docs.to_string_lossy().to_string());
+        }
+        if let Some(dl) = xdg.download_dir() {
+            map.insert("Downloads".to_string(), dl.to_string_lossy().to_string());
+        }
+        if let Some(desktop) = xdg.desktop_dir() {
+            map.insert("Desktop".to_string(), desktop.to_string_lossy().to_string());
+        }
+        if let Some(pics) = xdg.picture_dir() {
+            map.insert("Pictures".to_string(), pics.to_string_lossy().to_string());
+        }
+        if let Some(music) = xdg.audio_dir() {
+            map.insert("Music".to_string(), music.to_string_lossy().to_string());
+        }
+        if let Some(videos) = xdg.video_dir() {
+            map.insert("Videos".to_string(), videos.to_string_lossy().to_string());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS uses the same standard structure under ~/
+        let append = |base: &PathBuf, sub| base.join(sub).to_string_lossy().to_string();
+        map.insert("Documents".to_string(), append(&home, "Documents"));
+        map.insert("Downloads".to_string(), append(&home, "Downloads"));
+        map.insert("Desktop".to_string(), append(&home, "Desktop"));
+        map.insert("Pictures".to_string(), append(&home, "Pictures"));
+        map.insert("Music".to_string(), append(&home, "Music"));
+        map.insert("Videos".to_string(), append(&home, "Movies")); // mac uses “Movies”
+    }
+
+    Ok(map)
 }

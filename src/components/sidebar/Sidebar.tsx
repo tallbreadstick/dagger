@@ -1,5 +1,5 @@
 import { createSignal, createEffect, Show, For } from "solid-js";
-import { getDirectoryTreeFromRoot, FileNode, resolveUserHome } from "../../scripts/navigation";
+import { getDirectoryTreeFromRoot, FileNode, resolveUserHome, resolveQuickAccess } from "../../scripts/navigation";
 import type { TabEntry } from "../../App";
 import { TreeNode } from "./TreeNode";
 import Tab from "../../classes/Tab";
@@ -28,15 +28,15 @@ export default function Sidebar(props: {
     // 🏠 Setup Quick Access
     createEffect(async () => {
         try {
-            const home = await resolveUserHome();
+            const map = await resolveQuickAccess();
             setQuickAccess([
-                { name: "Home", path: 'Home', icon: FaSolidHouse },
-                { name: "Documents", path: `${home}\\Documents`, icon: FaSolidFolder },
-                { name: "Downloads", path: `${home}\\Downloads`, icon: FaSolidDownload },
-                { name: "Desktop", path: `${home}\\Desktop`, icon: FaSolidDesktop },
-                { name: "Pictures", path: `${home}\\Pictures`, icon: FaSolidPhotoFilm },
-                { name: "Music", path: `${home}\\Music`, icon: FaSolidMusic },
-                { name: "Videos", path: `${home}\\Videos`, icon: FaSolidVideo },
+                { name: "Home", path: map["Home"], icon: FaSolidHouse },
+                { name: "Documents", path: map["Documents"], icon: FaSolidFolder },
+                { name: "Downloads", path: map["Downloads"], icon: FaSolidDownload },
+                { name: "Desktop", path: map["Desktop"], icon: FaSolidDesktop },
+                { name: "Pictures", path: map["Pictures"], icon: FaSolidPhotoFilm },
+                { name: "Music", path: map["Music"], icon: FaSolidMusic },
+                { name: "Videos", path: map["Videos"], icon: FaSolidVideo },
             ]);
         } catch (err) {
             console.error("Failed to set Quick Access paths:", err);

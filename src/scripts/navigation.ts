@@ -59,3 +59,19 @@ export async function openFromPath(path: string): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * Resolves the system's quick access directories (Home, Documents, etc.)
+ * in a cross-platform manner using the Tauri backend.
+ * @returns A promise that resolves to a Record<string, string> mapping
+ * directory names to their absolute paths.
+ */
+export async function resolveQuickAccess(): Promise<Record<string, string>> {
+  try {
+    const result = await invoke<Record<string, string>>("resolve_quick_access");
+    return result;
+  } catch (err) {
+    console.error("Failed to resolve quick access paths:", err);
+    throw err;
+  }
+}
