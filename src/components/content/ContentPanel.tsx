@@ -1,4 +1,4 @@
-import { createSignal, createEffect, onCleanup, Show, Accessor, Setter } from "solid-js";
+import { createSignal, createEffect, onCleanup, Show, Accessor, Setter, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
 import type { TabEntry } from "../../App";
 import { streamDirectoryContents, FileChunk } from "../../scripts/stream";
@@ -185,7 +185,7 @@ export default function ContentPanel(props: {
                     <LazyImage
                         src={`data:image;base64,${file.thumbnail}`}
                         alt={name}
-                        class={`${iconSize} object-cover rounded`}
+                        class={`${iconSize} object-cover rounded pointer-events-none`}
                     />
                     {isVideo && (
                         <div class="absolute inset-0 flex items-center justify-center">
@@ -251,19 +251,32 @@ export default function ContentPanel(props: {
     let dragStartedOnItem = false;
     let dragActive = false;
     let dragClearApplied = false;
+    let clickedViaItem = false;
     const DRAG_THRESHOLD = 4;
 
     const [dragStart, setDragStart] = createSignal({ x: 0, y: 0 });
     const [dragEnd, setDragEnd] = createSignal({ x: 0, y: 0 });
 
     function updateSelection(newSet: Set<string>) {
-        // Force Solid reactivity
+        const prev = props.selectedItems();
+        // Prevent redundant reactivity updates if the sets are identical
+        if (prev.size === newSet.size && [...prev].every(p => newSet.has(p))) return;
         props.setSelectedItems(new Set(newSet));
     }
 
     function handleItemClick(file: FileChunk, index: number, e: MouseEvent) {
         if (props.justDragged()) {
             props.setJustDragged(false);
+            return;
+        }
+
+        if (e.type !== 'click') return;
+        const target = e.target as HTMLElement;
+        if (
+            target.closest(".actionbar") ||
+            target.closest(".actionbar-menu") ||
+            target.closest(".action-button")
+        ) {
             return;
         }
 
@@ -278,7 +291,6 @@ export default function ContentPanel(props: {
             const range = files().slice(start, end + 1);
             range.forEach(f => next.add(f.path));
         } else if (ctrl) {
-            if (e.type === 'mouseup') return;
             if (next.has(file.path)) next.delete(file.path);
             else next.add(file.path);
         } else {
@@ -292,6 +304,16 @@ export default function ContentPanel(props: {
 
     function handleMouseDown(e: MouseEvent) {
         if (e.button !== 0) return;
+
+        const target = e.target as HTMLElement;
+        if (
+            target.closest(".actionbar") ||
+            target.closest(".actionbar-menu") ||
+            target.closest(".action-button")
+        ) {
+            return;
+        }
+
         setDragStart({ x: e.clientX, y: e.clientY });
         setDragEnd({ x: e.clientX, y: e.clientY });
 
@@ -299,8 +321,9 @@ export default function ContentPanel(props: {
         props.setJustDragged(false);
         dragSelection.clear();
         dragClearApplied = false;
-        dragStartedOnItem = !!(e.target as HTMLElement)?.closest(".selectable-item");
+        dragStartedOnItem = !!target.closest(".selectable-item");
         dragActive = false;
+        clickedViaItem = false;
 
         const ctrl = e.ctrlKey || e.metaKey;
         if (!ctrl && !dragStartedOnItem) {
@@ -363,10 +386,11 @@ export default function ContentPanel(props: {
         if (dragActive) {
             props.setJustDragged(true);
             setTimeout(() => props.setJustDragged(false), 40);
-        } else {
+        } else if (!clickedViaItem) {
             handleItemClickUnderMouse(e);
         }
 
+        clickedViaItem = false;
         dragSelection.clear();
         dragClearApplied = false;
         dragStartedOnItem = false;
@@ -385,13 +409,26 @@ export default function ContentPanel(props: {
 
     function startDragOrSelect(file: FileChunk, index: number, e: MouseEvent) {
         if (e.button !== 0) return;
+        clickedViaItem = true;
         handleItemClick(file, index, e);
     }
+
+    onMount(() => {
+        document.addEventListener("mousedown", handleMouseDown, true);
+        document.addEventListener("mouseup", handleMouseUp, true);
+        document.addEventListener("mousemove", handleMouseMove, true);
+        onCleanup(() => {
+            document.removeEventListener("mousedown", handleMouseDown, true);
+            document.removeEventListener("mouseup", handleMouseUp, true);
+            document.removeEventListener("mousemove", handleMouseMove, true);
+        });
+    });
 
     return (
         <div
             ref={(el) => (_panelEl = el)}
             class="relative flex-1 flex flex-col h-full overflow-hidden">
+
             <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
                 <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
                     <div
@@ -402,10 +439,7 @@ export default function ContentPanel(props: {
             </Show>
 
             <div
-                class="flex flex-grow flex-col overflow-hidden"
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}>
+                class="flex flex-grow flex-col overflow-hidden">
                 <Show
                     when={isHomePath()}
                     fallback={

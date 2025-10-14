@@ -4,7 +4,7 @@
  * File actions toolbar sitting above the content panel.
  */
 
-import { createSignal, Show, For } from "solid-js";
+import { createSignal, Show, For, onMount, onCleanup, Accessor, createMemo } from "solid-js";
 import { Portal } from "solid-js/web";
 import {
     FaSolidPlus,
@@ -23,6 +23,7 @@ import {
 import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
 import ViewMenu from "./ViewMenu";
+import { copyItemsToClipboard } from "../../scripts/actions";
 
 export default function ActionBar(props: {
     sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
@@ -37,6 +38,7 @@ export default function ActionBar(props: {
     setShowExtensions: (v: boolean) => void;
     iconSize: 'small' | 'medium' | 'large';
     setIconSize: (v: 'small' | 'medium' | 'large') => void;
+    selectedItems: Accessor<Set<string>>;
 }) {
     const [openMenu, setOpenMenu] = createSignal<null | "new" | "sort" | "view">(null);
     const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -53,7 +55,21 @@ export default function ActionBar(props: {
             setOpenMenu(null);
         }
     }
-    document.addEventListener("click", handleClickAway);
+
+    function hasSelectedItems() {
+        return props.selectedItems().size > 0;
+    }
+
+    function copy() {
+        if (!hasSelectedItems()) return;
+        const items = Array.from(props.selectedItems());
+        copyItemsToClipboard(items);
+    }
+
+    onMount(() => {
+        document.addEventListener("click", handleClickAway);
+        onCleanup(() => document.removeEventListener("click", handleClickAway));
+    });
 
     const iconPresets = [
         { key: 'Small Grid', icon: <FaSolidTableCells />, set: () => {
@@ -75,7 +91,7 @@ export default function ActionBar(props: {
     ] as const;
 
     return (
-        <div class="flex items-center gap-2 px-3 py-1.5 border-b border-gray-300/50 bg-gray-100/60 backdrop-blur-md select-none z-10 justify-between">
+        <div class="actionbar flex items-center gap-2 px-3 py-1.5 border-b border-gray-300/50 bg-gray-100/60 backdrop-blur-md select-none z-10 justify-between">
             {/* LEFT section */}
             <div class="flex items-center gap-2">
                 {/* New File */}
@@ -89,11 +105,28 @@ export default function ActionBar(props: {
 
                 {/* Edit actions */}
                 <div class="flex items-center gap-1 border-l border-gray-400/40 pl-2">
-                    <ActionIcon icon={<FaSolidScissors />} label="Cut" />
-                    <ActionIcon icon={<FaSolidCopy />} label="Copy" />
-                    <ActionIcon icon={<FaSolidPaste />} label="Paste" />
-                    <ActionIcon icon={<FaSolidPen />} label="Rename" />
-                    <ActionIcon icon={<FaSolidTrash />} label="Delete" />
+                    <ActionIcon
+                        icon={<FaSolidScissors />}
+                        label="Cut"
+                    />
+                    <ActionIcon
+                        icon={<FaSolidCopy />}
+                        label="Copy"
+                        action={copy}
+                        validation={hasSelectedItems}
+                    />
+                    <ActionIcon
+                        icon={<FaSolidPaste />}
+                        label="Paste"
+                    />
+                    <ActionIcon
+                        icon={<FaSolidPen />}
+                        label="Rename"
+                    />
+                    <ActionIcon
+                        icon={<FaSolidTrash />}
+                        label="Delete"
+                    />
                 </div>
 
                 {/* Divider */}
@@ -173,11 +206,20 @@ export default function ActionBar(props: {
     );
 }
 
-function ActionIcon(props: { icon: any; label: string }) {
+function ActionIcon(props: { icon: any; label: string; action?: () => void; validation?: () => boolean }) {
+    const isDisabled = createMemo(() => props.validation ? !props.validation() : false);
+
     return (
         <button
             title={props.label}
-            class="action-button p-2 rounded hover:bg-white/50 transition"
+            class={`action-button p-2 rounded hover:bg-white/50 transition ${
+                isDisabled() ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+            onClick={() => {
+                console.log("clicked?");
+                if (!isDisabled() && props.action) props.action();
+            }}
+            disabled={isDisabled()}
         >
             {props.icon}
         </button>

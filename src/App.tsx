@@ -76,15 +76,23 @@ export default function App() {
             if (justDragged()) return;
 
             const target = e.target as HTMLElement;
+            // Ignore clicks inside UI chrome (action bar, menus, buttons)
+            if (
+                target.closest(".actionbar") ||
+                target.closest(".actionbar-menu") ||
+                target.closest(".action-button") ||
+                target.closest(".titlebar") // optional: ignore titlebar, etc.
+            ) {
+                return;
+            }
+
             // If the mousedown is NOT on a selectable item, clear selection
             if (!target.closest(".selectable-item")) {
                 setSelectedItems(new Set<string>());
                 setLastClickedIndex(null);
             }
         };
-
         window.addEventListener("mousedown", handleGlobalMouseDown);
-
         onCleanup(() => {
             window.removeEventListener("mousedown", handleGlobalMouseDown);
         });
@@ -264,6 +272,7 @@ export default function App() {
                                 setShowExtensions={setShowExtensions}
                                 iconSize={iconSize()}
                                 setIconSize={setIconSize}
+                                selectedItems={selectedItems}
                             />
                             {/* ContentPanel below */}
                             <div class="flex-1 overflow-auto">

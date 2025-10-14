@@ -11,7 +11,7 @@ use crate::{
         nav::{
             get_tree_from_root, is_directory, list_directory_contents, open_from_path, resolve_user,
         },
-        stream::{stream_directory_contents, FileStreamState},
+        stream::{stream_directory_contents, copy_items_to_clipboard, FileStreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
@@ -42,6 +42,7 @@ pub fn run() {
             is_directory,
             // stream
             stream_directory_contents,
+            copy_items_to_clipboard,
             // util
             resolve_path_command,
             resolve_quick_access,
