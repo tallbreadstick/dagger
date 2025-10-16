@@ -20,6 +20,8 @@ import ContentPanel from "./components/content/ContentPanel";
 import { openFromPath } from "./scripts/navigation";
 import { isDirectory } from "./scripts/stream";
 import { useLayoutCache } from "./scripts/layout";
+import { Toaster } from "solid-toast";
+import ConflictPrompt from "./components/ConflictPrompt";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -210,6 +212,7 @@ export default function App() {
     return (
         <div class="w-full h-full flex flex-col overflow-hidden">
             <TitleBar />
+            <ConflictPrompt />
 
             <TabMenu
                 tabs={tabs}
@@ -222,6 +225,7 @@ export default function App() {
             />
 
             <div class="flex flex-col flex-1 min-h-0 bg-gray-200/40 z-1">
+
                 {/* NavigationBar — fixed height */}
                 <NavigationBar
                     currentTabEntry={currentTab}
@@ -260,6 +264,7 @@ export default function App() {
                         {/* Main content area */}
                         <div class="flex-1 min-w-0 overflow-auto flex flex-col custom-scrollbar">
                             <ActionBar
+                                currentTab={currentTab()}
                                 sortKey={sortKey()}
                                 setSortKey={setSortKey}
                                 ascending={ascending()}
@@ -303,6 +308,7 @@ export default function App() {
                 </div>
             </div>
 
+            <Toaster />
         </div>
     );
 }

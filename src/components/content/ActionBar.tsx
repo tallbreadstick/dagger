@@ -24,8 +24,10 @@ import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
 import ViewMenu from "./ViewMenu";
 import { copyItemsToClipboard, pasteItemsFromClipboard } from "../../scripts/actions";
+import { TabEntry } from "../../App";
 
 export default function ActionBar(props: {
+    currentTab: TabEntry | null;
     sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
     setSortKey: (key: 'name' | 'size' | 'filetype' | 'date_modified') => void;
     ascending: boolean;
@@ -67,7 +69,7 @@ export default function ActionBar(props: {
     }
 
     function paste() {
-        pasteItemsFromClipboard("gabagool");
+        pasteItemsFromClipboard(props.currentTab?.tab.workingDir);
     }
 
     onMount(() => {

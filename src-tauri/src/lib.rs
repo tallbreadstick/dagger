@@ -11,7 +11,10 @@ use crate::{
         nav::{
             get_tree_from_root, is_directory, list_directory_contents, open_from_path, resolve_user,
         },
-        stream::{stream_directory_contents, copy_items_to_clipboard, paste_items_from_clipboard, FileStreamState},
+        stream::{
+            copy_items_to_clipboard, paste_items_from_clipboard, stream_directory_contents, resolve_copy_conflict,
+            CopyStreamState, FileStreamState,
+        },
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
@@ -26,6 +29,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(Arc::new(FileStreamState::default()))
+        .manage(Arc::new(CopyStreamState::new()))
         .manage(Arc::new(
             ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
         ))
@@ -44,6 +48,7 @@ pub fn run() {
             stream_directory_contents,
             copy_items_to_clipboard,
             paste_items_from_clipboard,
+            resolve_copy_conflict,
             // util
             resolve_path_command,
             resolve_quick_access,
