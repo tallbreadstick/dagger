@@ -23,7 +23,7 @@ import {
 import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
 import ViewMenu from "./ViewMenu";
-import { copyItemsToClipboard } from "../../scripts/actions";
+import { copyItemsToClipboard, pasteItemsFromClipboard } from "../../scripts/actions";
 
 export default function ActionBar(props: {
     sortKey: 'name' | 'size' | 'filetype' | 'date_modified';
@@ -64,6 +64,10 @@ export default function ActionBar(props: {
         if (!hasSelectedItems()) return;
         const items = Array.from(props.selectedItems());
         copyItemsToClipboard(items);
+    }
+
+    function paste() {
+        pasteItemsFromClipboard("gabagool");
     }
 
     onMount(() => {
@@ -118,6 +122,7 @@ export default function ActionBar(props: {
                     <ActionIcon
                         icon={<FaSolidPaste />}
                         label="Paste"
+                        action={paste}
                     />
                     <ActionIcon
                         icon={<FaSolidPen />}

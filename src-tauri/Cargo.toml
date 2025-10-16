@@ -47,7 +47,8 @@ windows = { version = "0.62.2", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Memory",
     "Win32_System_Ole",
-    "Win32_System_DataExchange"
+    "Win32_System_DataExchange",
+    "Win32_System_Com_StructuredStorage"
 ] }
 clipboard-win = "5.4.1"
 windows-core = "0.62.2"

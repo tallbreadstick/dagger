@@ -76,3 +76,22 @@ body.unfocused::before {
 .sidebar {
   transition: width 0.15s ease-out, height 0.15s ease-out;
 }
+
+.hide-scrollbar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+
+.hide-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(100, 100, 100, 0.3);
+    border-radius: 10px;
+    transition: background-color 0.2s;
+}
+
+.hide-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(220, 220, 220, 0.6);
+}

@@ -42,7 +42,7 @@ export default function ContentPanel(props: {
     setJustDragged: Setter<boolean>;
 }) {
 
-    let _panelEl: HTMLDivElement;
+    let panelEl: HTMLDivElement;
 
     const [_fileMap, setFileMap] = createSignal<Map<string, FileChunk>>(new Map());
     const [files, setFiles] = createSignal<FileChunk[]>([]);
@@ -247,9 +247,8 @@ export default function ContentPanel(props: {
     // SELECTION + DRAG HANDLERS (FIXED)
     // --------------------------------------
 
+    const [dragActive, setDragActive] = createSignal(false);
     const dragSelection = new Set<string>();
-    let dragStartedOnItem = false;
-    let dragActive = false;
     let dragClearApplied = false;
     let clickedViaItem = false;
     const DRAG_THRESHOLD = 4;
@@ -306,14 +305,23 @@ export default function ContentPanel(props: {
         if (e.button !== 0) return;
 
         const target = e.target as HTMLElement;
+
+        // 🛑 Ignore clicks outside panel or on UI controls
         if (
+            !panelEl.contains(target) ||
             target.closest(".actionbar") ||
             target.closest(".actionbar-menu") ||
             target.closest(".action-button")
-        ) {
-            return;
-        }
+        ) return;
 
+        // 🛑 Ignore clicks that start on file items
+        if (target.closest(".selectable-item")) return;
+
+        // ✅ Only start drag if inside .content-panel but not on .selectable-item
+        const insidePanel = target.closest(".content-panel");
+        if (!insidePanel) return;
+
+        // Initialize drag tracking
         setDragStart({ x: e.clientX, y: e.clientY });
         setDragEnd({ x: e.clientX, y: e.clientY });
 
@@ -321,12 +329,11 @@ export default function ContentPanel(props: {
         props.setJustDragged(false);
         dragSelection.clear();
         dragClearApplied = false;
-        dragStartedOnItem = !!target.closest(".selectable-item");
-        dragActive = false;
+        setDragActive(false);
         clickedViaItem = false;
 
         const ctrl = e.ctrlKey || e.metaKey;
-        if (!ctrl && !dragStartedOnItem) {
+        if (!ctrl) {
             updateSelection(new Set());
             props.setLastClickedIndex(null);
         }
@@ -339,11 +346,11 @@ export default function ContentPanel(props: {
         const dx = e.clientX - start.x;
         const dy = e.clientY - start.y;
 
-        if (!dragActive && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
-            dragActive = true;
+        if (!dragActive() && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+            setDragActive(true);
             props.setJustDragged(true);
         }
-        if (!dragActive) return;
+        if (!dragActive()) return;
 
         setDragEnd({ x: e.clientX, y: e.clientY });
 
@@ -383,7 +390,7 @@ export default function ContentPanel(props: {
         if (!props.isDragging()) return;
         props.setIsDragging(false);
 
-        if (dragActive) {
+        if (dragActive()) {
             props.setJustDragged(true);
             setTimeout(() => props.setJustDragged(false), 40);
         } else if (!clickedViaItem) {
@@ -393,8 +400,7 @@ export default function ContentPanel(props: {
         clickedViaItem = false;
         dragSelection.clear();
         dragClearApplied = false;
-        dragStartedOnItem = false;
-        dragActive = false;
+        setDragActive(false);
     }
 
     function handleItemClickUnderMouse(e: MouseEvent) {
@@ -426,8 +432,8 @@ export default function ContentPanel(props: {
 
     return (
         <div
-            ref={(el) => (_panelEl = el)}
-            class="relative flex-1 flex flex-col h-full overflow-hidden">
+            ref={(el) => (panelEl = el)}
+            class="relative flex-1 flex flex-col h-full overflow-hidden content-panel">
 
             <Show when={showProgress()} fallback={<div class="w-full h-1.5 mb-2 bg-gray-200" />}>
                 <div class="relative w-full h-1.5 bg-gray-200 overflow-hidden mb-2">
@@ -493,7 +499,7 @@ export default function ContentPanel(props: {
                 </span>
             </div>
 
-            <Show when={props.isDragging()}>
+            <Show when={dragActive()}>
                 <Portal>
                     <div
                         class="fixed pointer-events-none z-50 border border-blue-400/70 bg-blue-200/30 rounded-sm"

@@ -13,3 +13,17 @@ export async function copyItemsToClipboard(paths: string[]): Promise<void> {
         console.error('copyItemsToClipboard failed:', err);
     }
 }
+
+/**
+ * Paste file list from clipboard to current directory
+ * @param paths Absolute paths of all selected files
+ * @returns Promise resolving to void if copy is successful
+ */
+export async function pasteItemsFromClipboard(workingDir: string): Promise<void> {
+    try {
+        console.log("attempting...");
+        await invoke('paste_items_from_clipboard', { workingDir });
+    } catch (err) {
+        console.error('pasteItemsFromClipboard failed:', err);
+    }
+}

@@ -128,30 +128,33 @@ export default function NavigationBar(props: {
                 </button>
             </div>
 
-            <div class="flex flex-row items-center grow bg-gray-300 border border-gray-300 rounded px-2 py-1">
-                {/* searchMode vs path display */}
-                {props.searchMode ? (
-                    <SearchBar mode={props.searchBarMode} setMode={props.setSearchBarMode} inputRef={(el) => (searchInputRef = el)} />
-                ) : (
-                    <PathBar
-                        currentPath={currentTab()?.workingDir ?? ""}
-                        onNavigate={(newPath) => {
-                            const entry = props.currentTabEntry();
-                            if (!entry) return;
+            <div class="flex flex-row items-center grow min-w-0 bg-gray-300 border border-gray-300 rounded px-2 py-1 overflow-hidden">
+                <div class="flex-1 min-w-0 overflow-x-auto no-scrollbar">
+                    {props.searchMode ? (
+                        <SearchBar
+                            mode={props.searchBarMode}
+                            setMode={props.setSearchBarMode}
+                            inputRef={(el) => (searchInputRef = el)}
+                        />
+                    ) : (
+                        <PathBar
+                            currentPath={currentTab()?.workingDir ?? ""}
+                            onNavigate={(newPath) => {
+                                const entry = props.currentTabEntry();
+                                if (!entry) return;
 
-                            // Normalize slashes
-                            const normalizedPath = newPath.replace(/\//g, "\\");
-
-                            // Use the existing updateTab helper to safely mutate & notify Solid
-                            updateTab(entry, (tab) => {
-                                const newTab = tab.clone();
-                                newTab.navigateTo(normalizedPath); // <- mutate the clone
-                                return newTab; // <- return for setTab
-                            });
-                        }}
-                    />
-                )}
+                                const normalizedPath = newPath.replace(/\//g, "\\");
+                                updateTab(entry, (tab) => {
+                                    const newTab = tab.clone();
+                                    newTab.navigateTo(normalizedPath);
+                                    return newTab;
+                                });
+                            }}
+                        />
+                    )}
+                </div>
             </div>
+
 
             <button
                 onClick={() => props.setSearchMode(!props.searchMode)}

@@ -3,4 +3,4 @@ pub mod opstream;
 pub mod thumbs;
 
 pub use fsstream::{stream_directory_contents, FileStreamState};
-pub use opstream::{copy_items_to_clipboard};
+pub use opstream::{copy_items_to_clipboard, paste_items_from_clipboard};

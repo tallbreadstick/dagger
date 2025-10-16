@@ -59,8 +59,20 @@ export default function PathBar(props: {
         }
     };
     onMount(() => {
+        const container = document.querySelector(".hide-scrollbar") as HTMLElement;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault(); // prevent zoom
+            container.scrollLeft += e.deltaY;
+        };
+
         document.addEventListener("click", handleClickOutside);
-        onCleanup(() => document.removeEventListener("click", handleClickOutside));
+        container.addEventListener("wheel", handleWheel, { passive: false });
+        onCleanup(() => {
+            document.removeEventListener("click", handleClickOutside);
+            container.removeEventListener("wheel", handleWheel);
+        });
     });
 
     const handleSegmentClick = (index: number) => {
@@ -159,19 +171,19 @@ export default function PathBar(props: {
                 }
             >
                 <div
-                    class="flex flex-row items-center overflow-x-auto no-scrollbar w-full cursor-text"
+                    class="flex flex-row items-center overflow-x-auto whitespace-nowrap hide-scrollbar w-full cursor-text min-h-[28px]"
                     onDblClick={(e) => {
-                        // Only trigger edit if the click is NOT on a segment or chevron
                         const target = e.target as HTMLElement;
                         if (
                             !target.closest(".path-segment") &&
                             !target.closest(".path-chevron")
                         ) {
                             e.stopPropagation();
-                            setEditMode(true); // your function to enable editing
+                            setEditMode(true);
                         }
                     }}
                 >
+
                     <Show
                         when={segments().length === 1 && segments()[0] === "Home"}
                         fallback={
