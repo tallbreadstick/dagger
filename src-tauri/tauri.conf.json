@@ -12,11 +12,12 @@
   "app": {
     "windows": [
       {
-        "title": "Dagger File Search Engine",
+        "title": "Dagger File Explorer",
         "width": 800,
         "height": 600,
         "decorations": false,
-        "transparent": true
+        "transparent": true,
+        "create": false
       }
     ],
     "security": {

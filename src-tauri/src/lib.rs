@@ -8,31 +8,39 @@ pub mod util;
 
 use crate::{
     filesys::{
-        nav::{
-            get_tree_from_root, is_directory, list_directory_contents, open_from_path, resolve_user,
-        },
-        stream::{
-            copy_items_to_clipboard, paste_items_from_clipboard, stream_directory_contents, resolve_copy_conflict,
-            CopyStreamState, FileStreamState,
-        },
+        nav::{get_tree_from_root, is_directory, list_directory_contents, open_from_path, resolve_user},
+        stream::{copy_items_to_clipboard, paste_items_from_clipboard, resolve_copy_conflict, stream_directory_contents, CopyStreamState, FileStreamState},
     },
     search::modals::{upload_audio_file, upload_document_file, upload_image_file},
     util::{
         caches::{fetch_layout_settings, update_layout_settings},
         cmd::{resolve_path_command, resolve_quick_access},
-        setup::setup_app_environment,
+        setup::{open_window, setup_app_environment, window_event_handler},
     },
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+
+    let file_stream_state = Arc::new(FileStreamState::default());
+    let copy_stream_state = Arc::new(CopyStreamState::new());
+    let rayon_thread_pool = Arc::new(ThreadPoolBuilder::new().num_threads(8).build().unwrap());
+
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .manage(Arc::new(FileStreamState::default()))
-        .manage(Arc::new(CopyStreamState::new()))
-        .manage(Arc::new(
-            ThreadPoolBuilder::new().num_threads(8).build().unwrap(),
-        ))
+        // Auto-start plugin
+        .plugin(tauri_plugin_autostart::Builder::new()
+            .app_name("Dagger File Explorer")
+            .build())
+        // Single instance hook: any subsequent launch triggers window creation
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // If window exists, show it
+            open_window(app);
+        }))
+        // Managed state
+        .manage(file_stream_state)
+        .manage(copy_stream_state)
+        .manage(rayon_thread_pool)
+        // Invoke handlers
         .invoke_handler(tauri::generate_handler![
             // modals
             upload_image_file,
@@ -55,7 +63,9 @@ pub fn run() {
             fetch_layout_settings,
             update_layout_settings
         ])
-        .setup(|app| setup_app_environment(app).map_err(|e| e.into()))
+        // Setup hook
+        .setup(setup_app_environment)
+        .on_window_event(window_event_handler)
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

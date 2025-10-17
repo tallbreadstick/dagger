@@ -1,66 +1,97 @@
-use tauri::{webview::Color, App, Emitter, Manager, Result, WindowEvent};
+use std::error::Error;
+
+use tauri::{
+    menu::{Menu, MenuItem}, tray::TrayIconBuilder, webview::Color, App, AppHandle, Emitter, Manager, Window, WindowEvent
+};
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 use crate::util::caches::{load_home_cache, load_layout_cache, SharedHomeCache, SharedLayoutCache};
 
-pub fn setup_app_environment(app: &mut App) -> Result<()> {
-    #[cfg(target_os = "windows")]
-    setup_window_acrylic(app)?;
-
-    #[cfg(not(target_os = "windows"))]
-    setup_window_transparency(app)?;
-
-    manage_home_cache(app)?;
-    manage_layout_cache(app)?;
+pub fn setup_app_environment(app: &mut App) -> Result<(), Box<dyn Error>> {
+    setup_system_tray(app).expect("Failed to setup system tray!");
+    manage_home_cache(app);
+    manage_layout_cache(app);
     Ok(())
 }
 
 #[cfg(target_os = "windows")]
-fn setup_window_acrylic(app: &mut App) -> Result<()> {
-    let window = app.get_webview_window("main").unwrap();
-
-    apply_acrylic(&window, Some((0, 0, 0, 20))).unwrap();
-
-    let win_clone = window.clone();
-
-    window.on_window_event(move |event| match event {
+pub fn window_event_handler(window: &Window, event: &WindowEvent) {
+    match event {
+        WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            window.hide().unwrap();
+        }
         WindowEvent::Focused(true) => {
-            let _ = win_clone.emit("window-focus", ());
-            apply_acrylic(&win_clone, Some((0, 0, 0, 20))).ok();
-            win_clone.set_background_color(Some(Color(0, 0, 0, 0))).ok();
+            let _ = window.emit("window-focus", ());
+            apply_acrylic(&window, Some((0, 0, 0, 20))).ok();
+            window.set_background_color(Some(Color(0, 0, 0, 0))).ok();
         }
         WindowEvent::Focused(false) => {
-            let _ = win_clone.emit("window-blur", ());
-            clear_acrylic(&win_clone).ok();
-            win_clone
+            let _ = window.emit("window-blur", ());
+            clear_acrylic(&window).ok();
+            window
                 .set_background_color(Some(Color(120, 120, 120, 255)))
                 .ok();
         }
         _ => {}
-    });
-
-    Ok(())
+    }
 }
 
-#[cfg(not(target_os = "windows"))]
-fn setup_window_transparency(app: &mut App) -> Result<()> {
-    let window = app.get_webview_window("main").unwrap();
-    // Set the background opacity to 0 for transparency
-    let opaque = tauri::webview::Color(120, 120, 120, 255);
-    window.set_background_color(Some(opaque)).ok();
-    Ok(())
-}
-
-fn manage_home_cache(app: &mut App) -> Result<()> {
+fn manage_home_cache(app: &mut App) {
     let handle = app.handle();
     let cache = load_home_cache(&handle);
     app.manage(SharedHomeCache::new(cache));
-    Ok(())
 }
 
-fn manage_layout_cache(app: &mut App) -> Result<()> {
+fn manage_layout_cache(app: &mut App) {
     let handle = app.handle();
     let cache = load_layout_cache(&handle);
     app.manage(SharedLayoutCache::new(cache));
+}
+
+fn setup_system_tray(app: &App) -> Result<(), Box<dyn Error>> {
+    let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
+    let close = MenuItem::with_id(app, "close", "Close", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &close])?;
+    let _tray = TrayIconBuilder::new()
+        .icon(app.default_window_icon().unwrap().clone())
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .tooltip("Dagger File Explorer")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => {
+                open_window(app);
+            }
+            "close" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
+        .build(app)?;
     Ok(())
+}
+
+/// Spawns the app window if none available
+pub fn open_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().unwrap();
+        window.set_focus().unwrap();
+    } else {
+        let new_window = tauri::WebviewWindowBuilder::new(
+            app,
+            "main",
+            tauri::WebviewUrl::App("index.html".into()),
+        )
+        .title("My App")
+        .visible(true)
+        .decorations(false)
+        .transparent(true)
+        .resizable(true)
+        .maximized(true)
+        .center()
+        .build()
+        .unwrap();
+        new_window.show().unwrap();
+        new_window.set_focus().unwrap();
+    }
 }

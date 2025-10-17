@@ -1,6 +1,6 @@
-use tauri::State;
-use std::sync::Arc;
 use serde::Deserialize;
+use std::sync::Arc;
+use tauri::State;
 
 use crate::filesys::stream::opstream::{ConflictResponse, CopyStreamState, DuplicateStrategy};
 
@@ -14,7 +14,7 @@ pub struct ResolveCopyPayload {
 #[tauri::command]
 pub async fn resolve_copy_conflict(
     payload: ResolveCopyPayload,
-    state: State<'_, Arc<CopyStreamState>>
+    state: State<'_, Arc<CopyStreamState>>,
 ) -> Result<(), String> {
     // parse strategy
     let strat = match payload.strategy.as_str() {
@@ -30,6 +30,7 @@ pub async fn resolve_copy_conflict(
     };
 
     // submit response (this will notify the blocked copy thread)
-    state.submit_conflict_response(payload.request_id, resp)
+    state
+        .submit_conflict_response(payload.request_id, resp)
         .map_err(|e| format!("failed to submit response: {}", e))
 }

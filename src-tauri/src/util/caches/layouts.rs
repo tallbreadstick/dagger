@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::{fs, io::Read, path::PathBuf, sync::Arc};
 use tauri::{AppHandle, State};
 use tokio::sync::RwLock;
@@ -43,7 +43,7 @@ pub enum ViewMode {
 pub enum IconSize {
     Small,
     Medium,
-    Large
+    Large,
 }
 
 impl Default for LayoutCache {
@@ -119,8 +119,7 @@ pub fn save_layout_cache(handle: &AppHandle, cache: &LayoutCache) {
 
     fs::write(&tmp_path, serialized)
         .unwrap_or_else(|_| panic!("Failed to write temp layout cache"));
-    fs::rename(&tmp_path, &path)
-        .unwrap_or_else(|_| panic!("Failed to rename temp layout cache"));
+    fs::rename(&tmp_path, &path).unwrap_or_else(|_| panic!("Failed to rename temp layout cache"));
 }
 
 #[tauri::command]

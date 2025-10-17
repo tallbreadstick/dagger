@@ -2,17 +2,18 @@ use std::{
     fs,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering}, Arc, Condvar, Mutex
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc, Condvar, Mutex,
     },
+    thread,
+    time::Duration,
 };
 
 use jwalk::WalkDir;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
-use crate::filesys::{
-    os::windows::{get_system_clipboard, set_system_clipboard},
-};
+use crate::filesys::os::windows::{get_system_clipboard, set_system_clipboard};
 
 /// How to resolve a single conflict
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -279,6 +280,10 @@ pub async fn paste_items_from_clipboard(
 
     // Phase 2: perform copying
     // The frontend will sum sizes from file events to produce a progress bar
+    // Track last "repeat for all" response across conflicts
+    let mut repeat_strategy: Option<DuplicateStrategy> = None;
+    let mut repeat_for_all = false;
+
     for (src, rel, _size) in entries.iter() {
         // cancellation check
         if state.cancelled.load(Ordering::Relaxed)
@@ -291,105 +296,119 @@ pub async fn paste_items_from_clipboard(
             return Ok(());
         }
 
-        // compute destination path
-        let dest_path = {
-            let mut d = dest_root.join(&rel);
-            // ensure parent dir exists
-            if let Some(parent) = d.parent() {
-                if let Err(err) = fs::create_dir_all(parent) {
-                    eprintln!("Failed to create dirs {}: {}", parent.display(), err);
-                    // attempt to continue
-                }
+        let mut dest_path = dest_root.join(&rel);
+
+        // ensure parent dir exists
+        if let Some(parent) = dest_path.parent() {
+            if let Err(err) = fs::create_dir_all(parent) {
+                eprintln!("Failed to create dirs {}: {}", parent.display(), err);
             }
+        }
 
-            // If file exists, choose a unique name (append " (copy)", " (copy 2)", etc.)
-            if d.exists() {
-                println!("Conflict encountered in stream!");
-                // emit conflict to frontend so it can show modal
+        // if file already exists -> handle conflict
+        if dest_path.exists() {
+            let chosen_strategy = if repeat_for_all {
+                // user chose "apply to all" earlier — reuse that strategy
+                repeat_strategy.unwrap_or(DuplicateStrategy::Index)
+            } else {
+                // add small delay to avoid thread issues
+                thread::sleep(Duration::from_millis(50));
+                // emit conflict to frontend
                 let _ = handle.emit(
-                    "clipboard-paste-conflict",
-                    serde_json::json!({
-                        "request_id": request_id,
-                        "src": src.display().to_string(),
-                        "dest": d.display().to_string(),
-                        "name": d.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string(),
-                    }),
-                );
+                "clipboard-paste-conflict",
+                serde_json::json!({
+                    "request_id": request_id,
+                    "src": src.display().to_string(),
+                    "dest": dest_path.display().to_string(),
+                    "name": dest_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string(),
+                }),
+            );
 
-                // build a ConflictRequest
+                // wait for user response
                 let conflict_req = ConflictRequest {
                     request_id,
                     src: src.display().to_string(),
-                    dest: d.display().to_string(),
-                    name: d
+                    dest: dest_path.display().to_string(),
+                    name: dest_path
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or("")
                         .to_string(),
                 };
 
-                // ask the state to block until user responds (or optionally timeout)
                 match state.request_conflict_decision(conflict_req) {
-                    Ok(response) => {
-                        match response.strategy {
-                            DuplicateStrategy::Ignore => {
-                                // skip this file; continue outer loop
-                                continue;
-                            }
-                            DuplicateStrategy::Replace => {
-                                // remove existing file and proceed to copy
-                                let _ = std::fs::remove_file(&d);
-                                // fallthrough and copy src -> d
-                            }
-                            DuplicateStrategy::Index => {
-                                // compute unique index name as you did before
-                                let base = d
-                                    .file_stem()
-                                    .and_then(|s| s.to_str())
-                                    .unwrap_or("file")
-                                    .to_string();
-                                let ext = d
-                                    .extension()
-                                    .and_then(|s| s.to_str())
-                                    .map(|s| format!(".{}", s))
-                                    .unwrap_or_default();
-                                let mut idx = 1;
-                                loop {
-                                    let name = if idx == 1 {
-                                        format!("{} (copy){}", base, ext)
-                                    } else {
-                                        format!("{} (copy {}){}", base, idx, ext)
-                                    };
-                                    let try_path = d.with_file_name(name);
-                                    if !try_path.exists() {
-                                        d = try_path;
-                                        break;
-                                    }
-                                    idx += 1;
-                                }
-                            }
+                    Ok(resp) => {
+                        if resp.repeat_for_all {
+                            repeat_for_all = true;
+                            repeat_strategy = Some(resp.strategy);
                         }
-
-                        // If response.repeat_for_all is true, you may want to set an ephemeral variable so subsequent conflicts
-                        // skip prompting and use the same strategy; implement as you see fit (store in local variable).
+                        resp.strategy
                     }
                     Err(e) => {
-                        // state was cancelled or mismatched; handle gracefully
                         eprintln!("conflict decision failed: {}", e);
-                        // you might choose to skip or abort whole operation
                         continue;
                     }
                 }
+            };
+
+            // apply chosen strategy
+            match chosen_strategy {
+                DuplicateStrategy::Ignore => {
+                    continue;
+                }
+                DuplicateStrategy::Replace => {
+                    let _ = std::fs::remove_file(&dest_path);
+                }
+                DuplicateStrategy::Index => {
+                    // Windows-style incrementing suffix logic
+                    let file_name = dest_path
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("file");
+                    let ext = dest_path
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .map(|s| format!(".{}", s))
+                        .unwrap_or_default();
+
+                    // Determine the base name and current index (if any)
+                    let (base, mut next_index) = {
+                        // Match patterns like:
+                        // file.txt              → ("file", 1)
+                        // file (1).txt          → ("file", 2)
+                        // file (copy).txt       → ("file (copy)", 1)
+                        // file (copy) (1).txt   → ("file (copy)", 2)
+                        let pattern =
+                            regex::Regex::new(r"^(?P<base>.+?)(?: \((?P<num>\d+)\))?$").unwrap();
+                        if let Some(caps) = pattern.captures(file_name) {
+                            let base = caps.name("base").unwrap().as_str().to_string();
+                            let num = caps
+                                .name("num")
+                                .and_then(|m| m.as_str().parse::<u32>().ok())
+                                .unwrap_or(0);
+                            (base, num + 1)
+                        } else {
+                            (file_name.to_string(), 1)
+                        }
+                    };
+
+                    // Try incrementally until a free name is found
+                    loop {
+                        let candidate = format!("{} ({}){}", base, next_index, ext);
+                        let try_path = dest_path.with_file_name(candidate);
+                        if !try_path.exists() {
+                            dest_path = try_path;
+                            break;
+                        }
+                        next_index += 1;
+                    }
+                }
             }
+        }
 
-            d
-        };
-
-        // Do the copy. For simplicity, we do a single fs::copy call (not chunked).
-        // For very large files you could copy in chunks and emit incremental bytes; implement later if needed.
+        // finally, perform copy
         match fs::copy(&src, &dest_path) {
             Ok(bytes_copied) => {
-                // emit event for copied file (src, dest, size)
                 let _ = handle.emit(
                     "clipboard-paste-file",
                     serde_json::json!({
@@ -401,7 +420,6 @@ pub async fn paste_items_from_clipboard(
                 );
             }
             Err(err) => {
-                // emit a failure event but continue with other files
                 let _ = handle.emit(
                     "clipboard-paste-file-error",
                     serde_json::json!({

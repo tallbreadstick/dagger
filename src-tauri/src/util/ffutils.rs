@@ -1,7 +1,7 @@
+use image::{load_from_memory, DynamicImage};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tauri::{AppHandle, Manager};
-use image::{DynamicImage, load_from_memory};
 
 /// Minimal FFmpeg handler for bundled binaries
 pub struct FFmpegHandler {
@@ -21,25 +21,37 @@ impl FFmpegHandler {
             panic!("FFprobe not found at {:?}", ffprobe_path);
         }
 
-        Self { ffmpeg_path, ffprobe_path }
+        Self {
+            ffmpeg_path,
+            ffprobe_path,
+        }
     }
 
     /// Generate a thumbnail from a video and return it as a DynamicImage in memory
     pub fn generate_thumbnail(&self, video: &str, time_sec: f32) -> DynamicImage {
         let output = Command::new(&self.ffmpeg_path)
             .args(&[
-                "-ss", &time_sec.to_string(), // seek to timestamp
-                "-i", video,                  // input file
-                "-frames:v", "1",             // only one frame
-                "-f", "image2pipe",           // output to stdout
-                "-vcodec", "png",             // output format PNG
-                "pipe:1",                     // write to stdout
+                "-ss",
+                &time_sec.to_string(), // seek to timestamp
+                "-i",
+                video, // input file
+                "-frames:v",
+                "1", // only one frame
+                "-f",
+                "image2pipe", // output to stdout
+                "-vcodec",
+                "png",    // output format PNG
+                "pipe:1", // write to stdout
             ])
             .output()
             .unwrap_or_else(|e| panic!("Failed to execute FFmpeg: {}", e));
 
         if !output.status.success() {
-            panic!("FFmpeg failed to generate thumbnail for video {}: {}", video, String::from_utf8_lossy(&output.stderr));
+            panic!(
+                "FFmpeg failed to generate thumbnail for video {}: {}",
+                video,
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
 
         load_from_memory(&output.stdout)
@@ -50,9 +62,12 @@ impl FFmpegHandler {
     pub fn probe_video(&self, video: &str) -> String {
         let output = Command::new(&self.ffprobe_path)
             .args(&[
-                "-v", "error",
-                "-show_entries", "format=duration:stream=codec_name,width,height",
-                "-of", "default=noprint_wrappers=1",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_name,width,height",
+                "-of",
+                "default=noprint_wrappers=1",
                 video,
             ])
             .output()
@@ -68,7 +83,8 @@ impl FFmpegHandler {
 
 /// Initialize FFmpegHandler and log FFmpeg help to the console
 pub fn ffmpeg_init(handle: &AppHandle) -> FFmpegHandler {
-    let resource_dir = handle.path()
+    let resource_dir = handle
+        .path()
         .resource_dir()
         .unwrap_or_else(|_| panic!("Failed to get Tauri resource directory"));
     let handler = FFmpegHandler::new(&resource_dir);

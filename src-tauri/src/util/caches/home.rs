@@ -4,9 +4,9 @@ use std::{collections::VecDeque, fs, io::Read, path::PathBuf};
 use tauri::AppHandle;
 use tokio::sync::RwLock;
 
+use crate::filesys::nav::FileItem;
 use crate::filesys::nav::FileItemWithThumbnail;
 use crate::util::caches::get_cache_dir;
-use crate::{filesys::nav::FileItem};
 
 const MAX_RECENT_FILES: usize = 50;
 const MAX_RECENT_DIRS: usize = 12;

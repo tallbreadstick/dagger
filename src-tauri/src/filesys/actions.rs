@@ -1,8 +1,8 @@
 // src/tauri/actions.rs
-use std::path::Path;
-use tokio::fs;
 use std::future::Future;
+use std::path::Path;
 use std::pin::Pin;
+use tokio::fs;
 
 /// Create a new empty file asynchronously
 #[tauri::command]
@@ -49,9 +49,9 @@ fn copy_dir_recursive<'a>(
             if file_type.is_dir() {
                 copy_dir_recursive(&entry.path(), &dest_path).await?;
             } else if file_type.is_file() {
-                fs::copy(entry.path(), &dest_path)
-                    .await
-                    .map_err(|e| format!("Failed to copy file {}: {}", entry.path().display(), e))?;
+                fs::copy(entry.path(), &dest_path).await.map_err(|e| {
+                    format!("Failed to copy file {}: {}", entry.path().display(), e)
+                })?;
             }
         }
 
@@ -105,8 +105,15 @@ fn delete_dir_recursive(
             .await
             .map_err(|e| format!("Failed to read directory {}: {}", path.display(), e))?;
 
-        while let Some(entry) = entries.next_entry().await.map_err(|e| format!("Failed to read entry: {}", e))? {
-            let file_type = entry.file_type().await.map_err(|e| format!("Failed to get file type: {}", e))?;
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| format!("Failed to read entry: {}", e))?
+        {
+            let file_type = entry
+                .file_type()
+                .await
+                .map_err(|e| format!("Failed to get file type: {}", e))?;
             let entry_path = entry.path();
 
             if file_type.is_dir() {
@@ -115,9 +122,9 @@ fn delete_dir_recursive(
                     .await
                     .map_err(|e| format!("Failed to remove dir {}: {}", entry_path.display(), e))?;
             } else if file_type.is_file() {
-                fs::remove_file(&entry_path)
-                    .await
-                    .map_err(|e| format!("Failed to remove file {}: {}", entry_path.display(), e))?;
+                fs::remove_file(&entry_path).await.map_err(|e| {
+                    format!("Failed to remove file {}: {}", entry_path.display(), e)
+                })?;
             }
         }
 
