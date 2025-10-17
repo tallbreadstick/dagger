@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use tauri::{
-    menu::{Menu, MenuItem}, tray::TrayIconBuilder, webview::Color, App, AppHandle, Emitter, Manager, Window, WindowEvent
+    menu::{Menu, MenuItem}, tray::{MouseButton, TrayIconBuilder, TrayIconEvent}, webview::Color, App, AppHandle, Emitter, Manager, Window, WindowEvent
 };
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
@@ -11,6 +11,9 @@ pub fn setup_app_environment(app: &mut App) -> Result<(), Box<dyn Error>> {
     setup_system_tray(app).expect("Failed to setup system tray!");
     manage_home_cache(app);
     manage_layout_cache(app);
+    let paths_to_watch = vec![dirs_next::home_dir().unwrap().to_string_lossy().to_string()];
+    let watcher = crate::filesys::watcher::start_file_watcher(&app.handle(), paths_to_watch);
+    app.manage(watcher);
     Ok(())
 }
 
@@ -67,6 +70,20 @@ fn setup_system_tray(app: &App) -> Result<(), Box<dyn Error>> {
             }
             _ => {}
         })
+        .on_tray_icon_event(move |tray, event| {
+            let app = tray.app_handle();
+            match event {
+                TrayIconEvent::DoubleClick {
+                    id: _,
+                    position: _,
+                    rect: _,
+                    button: MouseButton::Left 
+                } => {
+                    open_window(app);
+                }
+                _ => {}
+            }
+        })
         .build(app)?;
     Ok(())
 }
@@ -82,7 +99,7 @@ pub fn open_window(app: &AppHandle) {
             "main",
             tauri::WebviewUrl::App("index.html".into()),
         )
-        .title("My App")
+        .title("Dagger File Explorer")
         .visible(true)
         .decorations(false)
         .transparent(true)
