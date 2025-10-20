@@ -343,8 +343,13 @@ export default function ContentPanel(props: {
         if (!props.isDragging()) return;
 
         const start = dragStart();
-        const dx = e.clientX - start.x;
-        const dy = e.clientY - start.y;
+        const panelRect = panelEl.getBoundingClientRect();
+
+        const clampedX = Math.min(Math.max(e.clientX, panelRect.left), panelRect.right);
+        const clampedY = Math.min(Math.max(e.clientY, panelRect.top), panelRect.bottom);
+
+        const dx = clampedX - start.x;
+        const dy = clampedY - start.y;
 
         if (!dragActive() && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
             setDragActive(true);
@@ -352,13 +357,13 @@ export default function ContentPanel(props: {
         }
         if (!dragActive()) return;
 
-        setDragEnd({ x: e.clientX, y: e.clientY });
+        setDragEnd({ x: clampedX, y: clampedY });
 
         const rect = {
-            left: Math.min(start.x, e.clientX),
-            right: Math.max(start.x, e.clientX),
-            top: Math.min(start.y, e.clientY),
-            bottom: Math.max(start.y, e.clientY),
+            left: Math.min(start.x, clampedX),
+            right: Math.max(start.x, clampedX),
+            top: Math.min(start.y, clampedY),
+            bottom: Math.max(start.y, clampedY),
         };
 
         dragSelection.clear();

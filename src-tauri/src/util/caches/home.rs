@@ -9,7 +9,7 @@ use crate::filesys::nav::FileItemWithThumbnail;
 use crate::util::caches::get_cache_dir;
 
 const MAX_RECENT_FILES: usize = 50;
-const MAX_RECENT_DIRS: usize = 12;
+const MAX_RECENT_DIRS: usize = 18;
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 pub struct HomeCache {

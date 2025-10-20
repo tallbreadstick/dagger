@@ -22,6 +22,8 @@ import { isDirectory } from "./scripts/stream";
 import { useLayoutCache } from "./scripts/layout";
 import { Toaster } from "solid-toast";
 import ConflictPrompt from "./components/ConflictPrompt";
+import { copyItemsToClipboard, cutItemsToClipboard, pasteItemsFromClipboard } from "./scripts/actions";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /** TabEntry: a store-proxied Tab plus its setTab setter */
 export type TabEntry = {
@@ -73,32 +75,29 @@ export default function App() {
     });
 
     onMount(() => {
-        const handleGlobalMouseDown = (e: MouseEvent) => {
-            // Ignore synthetic click immediately after a drag
-            if (justDragged()) return;
 
+        const handleGlobalMouseDown = (e: MouseEvent) => {
+            if (justDragged()) return;
             const target = e.target as HTMLElement;
-            // Ignore clicks inside UI chrome (action bar, menus, buttons)
             if (
                 target.closest(".actionbar") ||
                 target.closest(".actionbar-menu") ||
                 target.closest(".action-button") ||
-                target.closest(".titlebar") // optional: ignore titlebar, etc.
-            ) {
-                return;
-            }
-
-            // If the mousedown is NOT on a selectable item, clear selection
+                target.closest(".titlebar")
+            ) return;
             if (!target.closest(".selectable-item")) {
                 setSelectedItems(new Set<string>());
                 setLastClickedIndex(null);
             }
         };
+
         window.addEventListener("mousedown", handleGlobalMouseDown);
+
         onCleanup(() => {
             window.removeEventListener("mousedown", handleGlobalMouseDown);
         });
     });
+
 
     // factory to create a TabEntry
     function makeTab(path: string): TabEntry {
@@ -129,10 +128,11 @@ export default function App() {
         setTabs((prev) => prev.filter((e) => e.tab.id !== id));
 
         // safely update currentTab after store flush
-        queueMicrotask(() => {
+        queueMicrotask(async () => {
             const remaining = tabs.filter((e) => e.tab.id !== id);
             if (remaining.length === 0) {
                 setCurrentTab(null); // no tabs left
+                await getCurrentWindow().close();
             } else if (currentTab()?.tab.id === id) {
                 setCurrentTab(remaining[0]); // switch to first remaining tab
             }
@@ -206,6 +206,22 @@ export default function App() {
             } catch (err) {
                 console.error("Failed to open selected item:", err);
             }
+        },
+        selectAllItems: () => {
+
+        },
+        copySelectedItems: () => {
+            if (selectedItems().size < 0) return;
+            const items = Array.from(selectedItems());
+            copyItemsToClipboard(items);
+        },
+        cutSelectedItems: () => {
+            if (selectedItems().size < 0) return;
+            const items = Array.from(selectedItems());
+            cutItemsToClipboard(items);
+        },
+        pasteSelectedItems: () => {
+            pasteItemsFromClipboard(currentTab()?.tab.workingDir);
         }
     });
 

@@ -5,7 +5,7 @@ use windows::Win32::{
     Foundation::{HANDLE, HGLOBAL, POINT},
     System::{
         DataExchange::{
-            CloseClipboard, EmptyClipboard, EnumClipboardFormats, GetClipboardData,
+            CloseClipboard, EmptyClipboard, GetClipboardData,
             IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW, SetClipboardData,
         },
         Memory::{GlobalAlloc, GlobalLock, GlobalUnlock, GMEM_MOVEABLE, GMEM_ZEROINIT},
@@ -13,11 +13,19 @@ use windows::Win32::{
     },
     UI::Shell::{DragQueryFileW, DROPFILES, HDROP},
 };
-use windows_core::{w, BOOL, PCWSTR};
+use windows_core::{w, BOOL};
+
+#[derive(Debug)]
+pub enum ClipboardOp {
+    Copy,
+    Move,
+    Link,
+    Unknown
+}
 
 /// Copy real filesystem paths to the Windows clipboard in the same way Explorer does.
 /// Explorer will enable "Paste" after this call.
-pub fn set_system_clipboard(paths: Vec<String>) -> Result<(), String> {
+pub fn set_system_clipboard(paths: Vec<String>, op: ClipboardOp) -> Result<(), String> {
     unsafe {
         if paths.is_empty() {
             return Err("No valid paths provided".into());
@@ -67,8 +75,12 @@ pub fn set_system_clipboard(paths: Vec<String>) -> Result<(), String> {
         );
         GlobalUnlock(hdrop).ok();
 
-        // Preferred DropEffect = 5
-        let effect_val: u32 = 5;
+        let effect_val: u32 = match op {
+            ClipboardOp::Copy | ClipboardOp::Link => 5, // DROPEFFECT_COPY | DROPEFFECT_LINK
+            ClipboardOp::Move => 2, // DROPEFFECT_MOVE
+            _ => return Err(format!("Unknown DropEffect!"))
+        };
+
         let heffect = GlobalAlloc(GMEM_MOVEABLE | GMEM_ZEROINIT, 4)
             .map_err(|e| format!("GlobalAlloc (DropEffect) failed: {:?}", e))?;
         let eptr = GlobalLock(heffect) as *mut u32;
@@ -123,35 +135,12 @@ pub fn set_system_clipboard(paths: Vec<String>) -> Result<(), String> {
 }
 
 /// Retrieve paths and clipboard info for inspection.
-/// Returns all file paths if CF_HDROP exists, or an empty Vec otherwise.
-pub fn get_system_clipboard() -> Result<Vec<PathBuf>, String> {
+/// Returns `(file_list, clipboard_op)`
+pub fn get_system_clipboard() -> Result<(Vec<PathBuf>, ClipboardOp), String> {
     unsafe {
-        // 1. Open clipboard
         OpenClipboard(None).map_err(|e| format!("OpenClipboard failed: {}", e))?;
 
-        // Enumerate all formats
-        let mut fmt: u32 = 0;
-        loop {
-            match EnumClipboardFormats(fmt) {
-                next if next != 0 => {
-                    fmt = next;
-
-                    // Peek at HGLOBAL contents if available
-                    if let Ok(_) = IsClipboardFormatAvailable(fmt) {
-                        if let Ok(handle) = GetClipboardData(fmt) {
-                            let hglobal = HGLOBAL(handle.0);
-                            let ptr = GlobalLock(hglobal);
-                            if !ptr.is_null() {
-                                GlobalUnlock(hglobal).ok();
-                            }
-                        }
-                    }
-                }
-                _ => break,
-            }
-        }
-
-        // 2. Try to read CF_HDROP (file list)
+        // --- Gather file paths ---
         let mut file_list: Vec<PathBuf> = Vec::new();
         if IsClipboardFormatAvailable(CF_HDROP.0 as u32).is_ok() {
             let handle = GetClipboardData(CF_HDROP.0 as u32)
@@ -166,21 +155,27 @@ pub fn get_system_clipboard() -> Result<Vec<PathBuf>, String> {
             }
         }
 
-        // 3. Try to read "Preferred DropEffect"
-        let name_utf16: Vec<u16> = "Preferred DropEffect\0".encode_utf16().collect();
-        let fmt = RegisterClipboardFormatW(PCWSTR(name_utf16.as_ptr()));
+        // --- Try reading "Preferred DropEffect" ---
+        let mut op = ClipboardOp::Unknown;
+        let fmt = RegisterClipboardFormatW(w!("Preferred DropEffect"));
         if fmt != 0 && IsClipboardFormatAvailable(fmt).is_ok() {
-            let handle = GetClipboardData(fmt)
-                .map_err(|e| format!("GetClipboardData (DropEffect): {}", e))?;
-            let ptr = GlobalLock(HGLOBAL(handle.0)) as *const u32;
-            if !ptr.is_null() {
-                let _ = GlobalUnlock(HGLOBAL(handle.0));
+            if let Ok(handle) = GetClipboardData(fmt) {
+                let ptr = GlobalLock(HGLOBAL(handle.0)) as *const u32;
+                if !ptr.is_null() {
+                    let val = *ptr;
+                    op = match val {
+                        1 | 5 => ClipboardOp::Copy, // 1=Copy, 5=Copy|Link (Explorer)
+                        2 => ClipboardOp::Move,
+                        4 => ClipboardOp::Link,
+                        _ => ClipboardOp::Unknown,
+                    };
+                    GlobalUnlock(HGLOBAL(handle.0)).ok();
+                }
             }
         }
 
-        // 4. Close clipboard
         CloseClipboard().map_err(|e| format!("CloseClipboard failed: {}", e))?;
 
-        Ok(file_list)
+        Ok((file_list, op))
     }
 }

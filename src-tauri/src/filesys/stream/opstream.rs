@@ -13,7 +13,7 @@ use jwalk::WalkDir;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, State};
 
-use crate::filesys::os::windows::{get_system_clipboard, set_system_clipboard};
+use crate::filesys::os::windows::{get_system_clipboard, set_system_clipboard, ClipboardOp};
 
 /// How to resolve a single conflict
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -139,7 +139,12 @@ impl CopyStreamState {
 
 #[tauri::command]
 pub fn copy_items_to_clipboard(paths: Vec<String>) -> Result<(), String> {
-    set_system_clipboard(paths)
+    set_system_clipboard(paths, ClipboardOp::Copy)
+}
+
+#[tauri::command]
+pub fn cut_items_to_clipboard(paths: Vec<String>) -> Result<(), String> {
+    set_system_clipboard(paths, ClipboardOp::Move)
 }
 
 #[tauri::command]
@@ -153,12 +158,10 @@ pub async fn paste_items_from_clipboard(
     state.current_id.store(request_id, Ordering::Relaxed);
     state.cancelled.store(false, Ordering::Relaxed);
 
-    // 1) Get clipboard paths (CF_HDROP etc.)
-    let clipboard_paths = match get_system_clipboard() {
+    // 1) Get clipboard paths and operation
+    let (clipboard_paths, clipboard_op) = match get_system_clipboard() {
         Ok(v) => v,
-        Err(e) => {
-            return Err(format!("Failed to read clipboard: {}", e));
-        }
+        Err(e) => return Err(format!("Failed to read clipboard: {}", e)),
     };
 
     if clipboard_paths.is_empty() {
@@ -166,15 +169,7 @@ pub async fn paste_items_from_clipboard(
     }
 
     // Normalize working dir
-    let dest_root = {
-        let p = PathBuf::from(&working_dir);
-        #[cfg(not(target_os = "windows"))]
-        {
-            p = PathBuf::from(p.to_string_lossy().to_string().replace("\\", "/"));
-        }
-        p
-    };
-
+    let dest_root = PathBuf::from(&working_dir);
     if !dest_root.is_dir() {
         return Err(format!(
             "Working dir is not a directory: {}",
@@ -182,14 +177,11 @@ pub async fn paste_items_from_clipboard(
         ));
     }
 
-    // Phase 1: scan -> build list of files to copy (src_path, rel_path, size)
-    // We will preserve directory structure:
-    // - if clipboard item is a file: rel_path = file_name
-    // - if clipboard item is a directory: rel_path = path relative to that directory for its files
+    // Phase 1: scan -> build list of files to copy/move
     let mut entries: Vec<(PathBuf, PathBuf, u64)> = Vec::new(); // (src, rel, size)
     let mut total_size: u64 = 0;
 
-    for root in &clipboard_paths {
+    for root_path in &clipboard_paths {
         // cancellation check
         if state.cancelled.load(Ordering::Relaxed)
             || state.current_id.load(Ordering::Relaxed) != request_id
@@ -201,25 +193,22 @@ pub async fn paste_items_from_clipboard(
             return Ok(());
         }
 
-        let root_path = root;
         if root_path.is_file() {
             let size = fs::metadata(root_path).map(|m| m.len()).unwrap_or(0);
             let rel = root_path
                 .file_name()
-                .map(|n| PathBuf::from(n))
+                .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("unknown"));
             entries.push((root_path.clone(), rel, size));
             total_size = total_size.saturating_add(size);
         } else if root_path.is_dir() {
-            // Preserve the root folder itself by prefixing its name to relative entries
+            // include root folder name
             let root_name = root_path
                 .file_name()
-                .map(|n| PathBuf::from(n))
+                .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("unknown"));
 
-            let walker = WalkDir::new(root_path)
-                .max_depth(std::usize::MAX)
-                .follow_links(false);
+            let walker = WalkDir::new(root_path).follow_links(false);
             for entry in walker.into_iter().filter_map(|e| e.ok()) {
                 if state.cancelled.load(Ordering::Relaxed)
                     || state.current_id.load(Ordering::Relaxed) != request_id
@@ -232,8 +221,6 @@ pub async fn paste_items_from_clipboard(
                 }
 
                 let path = entry.path();
-
-                // skip the directory root itself (we create it implicitly)
                 if &path == root_path {
                     continue;
                 }
@@ -241,17 +228,10 @@ pub async fn paste_items_from_clipboard(
                 if let Ok(md) = entry.metadata() {
                     if md.is_file() {
                         let size = md.len();
-
-                        // relative path inside the root folder
-                        let inner_rel = match path.strip_prefix(root_path) {
-                            Ok(r) => r.to_path_buf(),
-                            Err(_) => path
-                                .file_name()
-                                .map(|n| PathBuf::from(n))
-                                .unwrap_or_default(),
-                        };
-
-                        // prepend the folder name so "src/main.rs" stays inside "src/"
+                        let inner_rel = path
+                            .strip_prefix(root_path)
+                            .map(|r| r.to_path_buf())
+                            .unwrap_or_else(|_| PathBuf::from("unknown"));
                         let rel = root_name.join(inner_rel);
 
                         entries.push((path.to_path_buf(), rel, size));
@@ -259,28 +239,21 @@ pub async fn paste_items_from_clipboard(
                     }
                 }
             }
-        } else {
-            // If path doesn't exist, skip but log
-            println!(
-                "clipboard path not found or unsupported: {}",
-                root_path.display()
-            );
         }
     }
 
-    // Emit scan result to frontend
+    // Emit scan result
     let _ = handle.emit(
         "clipboard-paste-scan",
         serde_json::json!({
             "request_id": request_id,
             "total_size": total_size,
             "file_count": entries.len(),
+            "operation": format!("{:?}", clipboard_op),
         }),
     );
 
-    // Phase 2: perform copying
-    // The frontend will sum sizes from file events to produce a progress bar
-    // Track last "repeat for all" response across conflicts
+    // Phase 2: perform copying or moving
     let mut repeat_strategy: Option<DuplicateStrategy> = None;
     let mut repeat_for_all = false;
 
@@ -297,34 +270,26 @@ pub async fn paste_items_from_clipboard(
         }
 
         let mut dest_path = dest_root.join(&rel);
-
-        // ensure parent dir exists
         if let Some(parent) = dest_path.parent() {
-            if let Err(err) = fs::create_dir_all(parent) {
-                eprintln!("Failed to create dirs {}: {}", parent.display(), err);
-            }
+            let _ = fs::create_dir_all(parent);
         }
 
-        // if file already exists -> handle conflict
+        // conflict handling
         if dest_path.exists() {
             let chosen_strategy = if repeat_for_all {
-                // user chose "apply to all" earlier — reuse that strategy
                 repeat_strategy.unwrap_or(DuplicateStrategy::Index)
             } else {
-                // add small delay to avoid thread issues
                 thread::sleep(Duration::from_millis(50));
-                // emit conflict to frontend
                 let _ = handle.emit(
-                "clipboard-paste-conflict",
-                serde_json::json!({
-                    "request_id": request_id,
-                    "src": src.display().to_string(),
-                    "dest": dest_path.display().to_string(),
-                    "name": dest_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string(),
-                }),
-            );
+                    "clipboard-paste-conflict",
+                    serde_json::json!({
+                        "request_id": request_id,
+                        "src": src.display().to_string(),
+                        "dest": dest_path.display().to_string(),
+                        "name": dest_path.file_name().and_then(|s| s.to_str()).unwrap_or("").to_string(),
+                    }),
+                );
 
-                // wait for user response
                 let conflict_req = ConflictRequest {
                     request_id,
                     src: src.display().to_string(),
@@ -344,23 +309,16 @@ pub async fn paste_items_from_clipboard(
                         }
                         resp.strategy
                     }
-                    Err(e) => {
-                        eprintln!("conflict decision failed: {}", e);
-                        continue;
-                    }
+                    Err(_) => continue,
                 }
             };
 
-            // apply chosen strategy
             match chosen_strategy {
-                DuplicateStrategy::Ignore => {
-                    continue;
-                }
+                DuplicateStrategy::Ignore => continue,
                 DuplicateStrategy::Replace => {
-                    let _ = std::fs::remove_file(&dest_path);
+                    let _ = fs::remove_file(&dest_path);
                 }
                 DuplicateStrategy::Index => {
-                    // Windows-style incrementing suffix logic
                     let file_name = dest_path
                         .file_stem()
                         .and_then(|s| s.to_str())
@@ -371,51 +329,55 @@ pub async fn paste_items_from_clipboard(
                         .map(|s| format!(".{}", s))
                         .unwrap_or_default();
 
-                    // Determine the base name and current index (if any)
-                    let (base, mut next_index) = {
-                        // Match patterns like:
-                        // file.txt              → ("file", 1)
-                        // file (1).txt          → ("file", 2)
-                        // file (copy).txt       → ("file (copy)", 1)
-                        // file (copy) (1).txt   → ("file (copy)", 2)
-                        let pattern =
-                            regex::Regex::new(r"^(?P<base>.+?)(?: \((?P<num>\d+)\))?$").unwrap();
-                        if let Some(caps) = pattern.captures(file_name) {
-                            let base = caps.name("base").unwrap().as_str().to_string();
-                            let num = caps
-                                .name("num")
-                                .and_then(|m| m.as_str().parse::<u32>().ok())
-                                .unwrap_or(0);
-                            (base, num + 1)
-                        } else {
-                            (file_name.to_string(), 1)
-                        }
-                    };
-
-                    // Try incrementally until a free name is found
+                    let mut i = 1;
                     loop {
-                        let candidate = format!("{} ({}){}", base, next_index, ext);
+                        let candidate = format!("{} ({}){}", file_name, i, ext);
                         let try_path = dest_path.with_file_name(candidate);
                         if !try_path.exists() {
                             dest_path = try_path;
                             break;
                         }
-                        next_index += 1;
+                        i += 1;
                     }
                 }
             }
         }
 
-        // finally, perform copy
-        match fs::copy(&src, &dest_path) {
-            Ok(bytes_copied) => {
+        // perform file operation (copy or move)
+        let result = match clipboard_op {
+            ClipboardOp::Copy | ClipboardOp::Link => fs::copy(src, &dest_path)
+                .map(|bytes| (bytes, false)), // false = not removed
+            ClipboardOp::Move => {
+                // try rename first (fast path)
+                match fs::rename(src, &dest_path) {
+                    Ok(_) => Ok((0, true)), // true = source removed
+                    Err(_) => {
+                        // fallback: cross-device move (copy + remove)
+                        let copy_result = fs::copy(src, &dest_path);
+                        if copy_result.is_ok() {
+                            let _ = fs::remove_file(src);
+                        }
+                        copy_result.map(|bytes| (bytes, true))
+                    }
+                }
+            },
+            // handle any future/unexpected variants gracefully
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Unsupported clipboard operation: {:?}", clipboard_op),
+            )),
+        };
+
+        match result {
+            Ok((bytes, _removed)) => {
                 let _ = handle.emit(
                     "clipboard-paste-file",
                     serde_json::json!({
                         "request_id": request_id,
                         "src": src.display().to_string(),
                         "dest": dest_path.display().to_string(),
-                        "size": bytes_copied,
+                        "size": bytes,
+                        "operation": format!("{:?}", clipboard_op),
                     }),
                 );
             }
@@ -433,15 +395,14 @@ pub async fn paste_items_from_clipboard(
         }
     }
 
-    println!("Copy stream completed!");
-
-    // Phase 3: done
+    // Done
     let _ = handle.emit(
         "clipboard-paste-complete",
         serde_json::json!({
             "request_id": request_id,
             "total_size": total_size,
-            "files_copied": entries.len(),
+            "files_processed": entries.len(),
+            "operation": format!("{:?}", clipboard_op),
         }),
     );
 

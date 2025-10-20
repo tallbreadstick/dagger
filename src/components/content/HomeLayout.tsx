@@ -28,13 +28,16 @@ const HomeLayout: Component<HomeLayoutProps> = ({
             <Show when={dirs().length}>
                 <div>
                     <h2 class="font-semibold text-sm text-gray-700 mb-2">Recent Directories</h2>
-                    <div class="grid gap-3 grid-cols-6">
+                    <div
+                        class="grid gap-3 justify-items-center"
+                        style={`grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));`} // mimic StandardLayout
+                    >
                         <For each={dirs()}>
                             {(f, index) => (
                                 <div
                                     onClick={(e) => startDragOrSelect(f, index(), e)}
                                     onDblClick={() => handleDoubleClick(f)}
-                                    class="flex flex-col items-center p-2 rounded shadow cursor-pointer selectable-item transition"
+                                    class="flex flex-col items-center p-2 rounded shadow cursor-pointer selectable-item transition w-full"
                                     classList={{
                                         "bg-white/80": !selectedItems().has(f.path),
                                         "bg-blue-200": selectedItems().has(f.path),

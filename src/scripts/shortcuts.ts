@@ -5,6 +5,10 @@ export type ShortcutActions = {
     toggleSearchMode: () => void;
     setSearchMode: (mode: "text" | "image" | "audio" | "document") => void;
     openSelectedItem: () => void;
+    selectAllItems: () => void;
+    copySelectedItems: () => void;
+    cutSelectedItems: () => void;
+    pasteSelectedItems: () => void;
 };
 
 // Global keyboard listener
@@ -32,12 +36,31 @@ export function useGlobalShortcuts(actions: ShortcutActions) {
                     e.preventDefault();
                     actions.setSearchMode("document");
                     break;
+                case "a":
+                    e.preventDefault();
+                    actions.selectAllItems();
+                    break;
+                case "c":
+                    e.preventDefault();
+                    actions.copySelectedItems();
+                    break;
+                case "x":
+                    e.preventDefault();
+                    actions.cutSelectedItems();
+                    break;
+                case "v":
+                    e.preventDefault();
+                    actions.pasteSelectedItems();
+                    break;
             }
         } else {
             switch (e.key.toLocaleLowerCase()) {
                 case "enter":
                     e.preventDefault();
                     actions.openSelectedItem();
+                    break;
+                case "delete":
+                    e.preventDefault();
                     break;
             }
         }

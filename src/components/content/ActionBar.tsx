@@ -23,7 +23,7 @@ import {
 import NewFileMenu from "./NewFileMenu";
 import SortMenu from "./SortMenu";
 import ViewMenu from "./ViewMenu";
-import { copyItemsToClipboard, pasteItemsFromClipboard } from "../../scripts/actions";
+import { copyItemsToClipboard, cutItemsToClipboard, pasteItemsFromClipboard } from "../../scripts/actions";
 import { TabEntry } from "../../App";
 
 export default function ActionBar(props: {
@@ -66,6 +66,12 @@ export default function ActionBar(props: {
         if (!hasSelectedItems()) return;
         const items = Array.from(props.selectedItems());
         copyItemsToClipboard(items);
+    }
+
+    function cut() {
+        if (!hasSelectedItems()) return;
+        const items = Array.from(props.selectedItems());
+        cutItemsToClipboard(items);
     }
 
     function paste() {
@@ -114,6 +120,8 @@ export default function ActionBar(props: {
                     <ActionIcon
                         icon={<FaSolidScissors />}
                         label="Cut"
+                        action={cut}
+                        validation={hasSelectedItems}
                     />
                     <ActionIcon
                         icon={<FaSolidCopy />}

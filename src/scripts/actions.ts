@@ -8,11 +8,24 @@ import { showCopyToast, showPasteProgressToast } from "../components/Toasts";
  */
 export async function copyItemsToClipboard(paths: string[]): Promise<void> {
     try {
-        console.log("attempting...");
         await invoke('copy_items_to_clipboard', { paths });
         showCopyToast(paths.length);
     } catch (err) {
         console.error('copyItemsToClipboard failed:', err);
+    }
+}
+
+/**
+ * Cut the currently selected file(s) to the OS clipboard
+ * @param paths Absolute paths of all selected files
+ * @returns Promise resolving to void if copy is successful
+ */
+export async function cutItemsToClipboard(paths: string[]): Promise<void> {
+    try {
+        await invoke('cut_items_to_clipboard', { paths });
+        showCopyToast(paths.length);
+    } catch (err) {
+        console.error('cutItemsToClipboard failed:', err);
     }
 }
 

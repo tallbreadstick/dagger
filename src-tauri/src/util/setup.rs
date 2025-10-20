@@ -1,13 +1,15 @@
 use std::error::Error;
 
 use tauri::{
-    menu::{Menu, MenuItem}, tray::{MouseButton, TrayIconBuilder, TrayIconEvent}, webview::Color, App, AppHandle, Emitter, Manager, Window, WindowEvent
+    menu::{Menu, MenuItem}, tray::{MouseButton, TrayIconBuilder, TrayIconEvent}, webview::Color, App, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Window, WindowEvent
 };
 use window_vibrancy::{apply_acrylic, clear_acrylic};
 
 use crate::util::caches::{load_home_cache, load_layout_cache, SharedHomeCache, SharedLayoutCache};
 
 pub fn setup_app_environment(app: &mut App) -> Result<(), Box<dyn Error>> {
+    #[cfg(desktop)]
+    setup_autostart(app);
     setup_system_tray(app).expect("Failed to setup system tray!");
     manage_home_cache(app);
     manage_layout_cache(app);
@@ -77,7 +79,7 @@ fn setup_system_tray(app: &App) -> Result<(), Box<dyn Error>> {
                     id: _,
                     position: _,
                     rect: _,
-                    button: MouseButton::Left 
+                    button: MouseButton::Left,
                 } => {
                     open_window(app);
                 }
@@ -93,11 +95,12 @@ pub fn open_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         window.show().unwrap();
         window.set_focus().unwrap();
+        window.reload().unwrap();
     } else {
-        let new_window = tauri::WebviewWindowBuilder::new(
+        let new_window = WebviewWindowBuilder::new(
             app,
             "main",
-            tauri::WebviewUrl::App("index.html".into()),
+            WebviewUrl::App("index.html".into()),
         )
         .title("Dagger File Explorer")
         .visible(true)
@@ -111,4 +114,17 @@ pub fn open_window(app: &AppHandle) {
         new_window.show().unwrap();
         new_window.set_focus().unwrap();
     }
+}
+
+/// Setup system autostart
+#[cfg(desktop)]
+fn setup_autostart(app: &App) {
+    use tauri_plugin_autostart::MacosLauncher;
+    use tauri_plugin_autostart::ManagerExt;
+    let _ = app.handle().plugin(tauri_plugin_autostart::init(
+        MacosLauncher::LaunchAgent,
+        None
+    ));
+    let autostart_manager = app.autolaunch();
+    let _ = autostart_manager.enable();
 }
